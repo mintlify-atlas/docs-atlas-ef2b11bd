@@ -1,0 +1,461 @@
+---
+title: "Multi-Model AI Assistant with Vercel AI Gateway"
+description: "Build a customer support assistant that intelligently routes queries to different models based on complexity with cost tracking"
+sidebarTitle: "Vercel AI Gateway"
+---
+
+Build a production-ready customer support assistant that automatically selects the right AI model for each query, optimizing both quality and cost. This tutorial uses Vercel AI SDK for model access and Helicone for monitoring.
+
+## What You'll Build
+
+A customer support system that:
+- **Classifies query complexity** using fast, cheap models
+- **Routes to appropriate models** based on complexity
+- **Caches responses** to reduce costs
+- **Tracks everything in Helicone** for analysis and optimization
+
+## Prerequisites
+
+- Node.js 18+ installed
+- [Vercel AI Gateway API key](https://vercel.com/dashboard)
+- [Helicone API key](https://helicone.ai/signup)
+- OpenAI and Anthropic API keys
+
+## Setup
+
+<Steps>
+  <Step title="Install Dependencies">
+    Create a new project and install required packages:
+
+    ```bash
+    mkdir support-assistant
+    cd support-assistant
+    npm init -y
+    npm install @ai-sdk/gateway ai zod
+    ```
+  </Step>
+
+  <Step title="Configure Environment">
+    Create a `.env` file with your API keys:
+
+    ```bash
+    VERCEL_AI_GATEWAY_API_KEY=your_vercel_key
+    HELICONE_API_KEY=sk-your-helicone-key
+    OPENAI_API_KEY=sk-your-openai-key
+    ANTHROPIC_API_KEY=sk-your-anthropic-key
+    ```
+  </Step>
+
+  <Step title="Initialize Gateway with Helicone">
+    Set up the AI Gateway to route all requests through Helicone for monitoring:
+
+    ```typescript
+    import { createGateway } from '@ai-sdk/gateway';
+    import { generateText, tool } from 'ai';
+    import { z } from 'zod';
+
+    const gateway = createGateway({
+      apiKey: process.env.VERCEL_AI_GATEWAY_API_KEY!,
+      baseURL: 'https://gateway.helicone.ai/v1',
+      headers: {
+        'Helicone-Auth': `Bearer ${process.env.HELICONE_API_KEY}`,
+      },
+    });
+    ```
+  </Step>
+</Steps>
+
+## Implementation
+
+### Step 1: Query Classification
+
+Use a small, fast model with tool calling for precise classification:
+
+```typescript
+import { tool } from 'ai';
+import { z } from 'zod';
+
+const classifyTool = tool({
+  description: 'Classify a customer support query by complexity',
+  parameters: z.object({
+    complexity: z.enum(['simple', 'complex', 'technical']).describe(
+      'simple: Basic questions about account, passwords, features. ' +
+      'complex: Refunds, complaints, escalations, urgent issues. ' +
+      'technical: API errors, integration issues, code problems.'
+    ),
+    reasoning: z.string().describe('Brief explanation for the classification'),
+    urgency: z.enum(['low', 'medium', 'high']).describe('How urgent is this query?'),
+  }),
+});
+
+async function classifyQuery(query: string) {
+  const result = await generateText({
+    model: gateway('openai/gpt-4o-mini'), // Fast and cheap for classification
+    tools: {
+      classify: classifyTool,
+    },
+    toolChoice: 'required',
+    prompt: `Classify this customer support query: "${query}"`,
+    headers: {
+      'Helicone-Property-Stage': 'classification',
+      'Helicone-Property-Tool': 'query-classifier',
+    },
+  });
+
+  const toolCall = result.toolCalls[0];
+  return {
+    complexity: toolCall.args.complexity as 'simple' | 'complex' | 'technical',
+    reasoning: toolCall.args.reasoning,
+    urgency: toolCall.args.urgency,
+  };
+}
+```
+
+### Step 2: Model Selection Strategy
+
+Route queries to the most appropriate model:
+
+```typescript
+function selectModel(complexity: string, urgency: string) {
+  // High urgency or technical issues get the best model
+  if (urgency === 'high' || complexity === 'technical') {
+    return gateway('anthropic/claude-3.5-sonnet');
+  }
+  
+  // Complex issues get GPT-4o
+  if (complexity === 'complex') {
+    return gateway('openai/gpt-4o');
+  }
+  
+  // Simple queries use the cheapest model
+  return gateway('openai/gpt-4o-mini');
+}
+
+function getModelName(complexity: string, urgency: string): string {
+  if (urgency === 'high' || complexity === 'technical') {
+    return 'claude-3.5-sonnet';
+  }
+  if (complexity === 'complex') {
+    return 'gpt-4o';
+  }
+  return 'gpt-4o-mini';
+}
+```
+
+### Step 3: Handle Support Tickets
+
+Process tickets with full tracing:
+
+```typescript
+interface SupportTicket {
+  id: string;
+  customerId: string;
+  query: string;
+  priority: 'low' | 'medium' | 'high';
+}
+
+async function processSupportTicket(ticket: SupportTicket) {
+  const sessionId = `ticket-${ticket.id}`;
+  
+  // Step 1: Classify the query
+  const classification = await classifyQuery(ticket.query);
+  
+  console.log(`Query classified as ${classification.complexity} (${classification.reasoning})`);
+  
+  // Step 2: Select appropriate model
+  const model = selectModel(classification.complexity, classification.urgency);
+  const modelName = getModelName(classification.complexity, classification.urgency);
+  
+  // Step 3: Generate response with caching
+  try {
+    const response = await generateText({
+      model,
+      messages: [
+        {
+          role: 'system',
+          content: `You are a customer support agent for TechCorp. 
+          Priority: ${ticket.priority}. 
+          Query complexity: ${classification.complexity}.
+          
+          Be helpful, professional, and concise. Always:
+          - Acknowledge the customer's issue
+          - Provide clear solutions
+          - Offer to escalate if needed
+          - Include relevant documentation links`
+        },
+        {
+          role: 'user',
+          content: ticket.query
+        }
+      ],
+      temperature: 0, // Deterministic for better caching
+      maxTokens: 500,
+      headers: {
+        // Session tracking
+        'Helicone-Session-Id': sessionId,
+        'Helicone-Session-Name': `Support Ticket ${ticket.id}`,
+        'Helicone-Session-Path': '/response-generation',
+        
+        // Metadata for analysis
+        'Helicone-User-Id': ticket.customerId,
+        'Helicone-Property-Ticket-Id': ticket.id,
+        'Helicone-Property-Priority': ticket.priority,
+        'Helicone-Property-Complexity': classification.complexity,
+        'Helicone-Property-Urgency': classification.urgency,
+        'Helicone-Property-Model': modelName,
+        
+        // Enable caching
+        'Helicone-Cache-Enabled': 'true',
+        'Helicone-Cache-Bucket-Max-Size': '100',
+        'Helicone-Cache-Seed': 'support-v1',
+      },
+    });
+    
+    return {
+      ticketId: ticket.id,
+      response: response.text,
+      model: modelName,
+      complexity: classification.complexity,
+      reasoning: classification.reasoning,
+      usage: response.usage,
+    };
+  } catch (error) {
+    console.error('Support ticket processing failed:', error);
+    
+    // Log error to Helicone
+    await generateText({
+      model: gateway('openai/gpt-4o-mini'),
+      prompt: `Error processing ticket ${ticket.id}: ${error}`,
+      headers: {
+        'Helicone-Session-Id': sessionId,
+        'Helicone-Property-Error': 'true',
+        'Helicone-Property-Ticket-Id': ticket.id,
+      },
+    });
+    
+    throw error;
+  }
+}
+```
+
+### Step 4: Add Retry Logic
+
+Handle failures gracefully:
+
+```typescript
+async function processSupportTicketWithRetry(
+  ticket: SupportTicket,
+  maxRetries = 2
+) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await processSupportTicket(ticket);
+    } catch (error) {
+      if (attempt === maxRetries) {
+        // Final attempt failed, return fallback response
+        return {
+          ticketId: ticket.id,
+          response: "I apologize, but I'm experiencing technical difficulties. Your ticket has been escalated to a human agent who will respond within 24 hours.",
+          model: 'fallback',
+          complexity: 'error',
+          reasoning: 'Processing failed',
+          usage: null,
+        };
+      }
+      
+      // Wait before retrying (exponential backoff)
+      await new Promise(resolve => 
+        setTimeout(resolve, Math.pow(2, attempt) * 1000)
+      );
+    }
+  }
+}
+```
+
+## Complete Example
+
+Put it all together:
+
+```typescript
+import { createGateway } from '@ai-sdk/gateway';
+import { generateText, tool } from 'ai';
+import { z } from 'zod';
+
+const gateway = createGateway({
+  apiKey: process.env.VERCEL_AI_GATEWAY_API_KEY!,
+  baseURL: 'https://gateway.helicone.ai/v1',
+  headers: {
+    'Helicone-Auth': `Bearer ${process.env.HELICONE_API_KEY}`,
+  },
+});
+
+// Example usage
+async function main() {
+  const tickets: SupportTicket[] = [
+    {
+      id: 'TICKET-001',
+      customerId: 'CUST-789',
+      query: 'How do I reset my password?',
+      priority: 'low',
+    },
+    {
+      id: 'TICKET-002',
+      customerId: 'CUST-456',
+      query: 'I need a refund immediately. This is unacceptable!',
+      priority: 'high',
+    },
+    {
+      id: 'TICKET-003',
+      customerId: 'CUST-123',
+      query: 'Getting 401 errors when calling /api/v2/users endpoint with valid auth token',
+      priority: 'medium',
+    },
+  ];
+
+  for (const ticket of tickets) {
+    console.log(`\n\nProcessing ticket ${ticket.id}...`);
+    const result = await processSupportTicketWithRetry(ticket);
+    
+    console.log(`Model: ${result.model}`);
+    console.log(`Complexity: ${result.complexity}`);
+    console.log(`Response: ${result.response}`);
+    
+    if (result.usage) {
+      console.log(`Tokens: ${result.usage.totalTokens}`);
+    }
+  }
+}
+
+main().catch(console.error);
+```
+
+## Monitor in Helicone
+
+Once your assistant is running, view performance in your [Helicone dashboard](https://helicone.ai/dashboard):
+
+### Filter by Complexity
+
+Filter requests by `Complexity` property to see:
+- Average response time by complexity
+- Cost per complexity tier
+- Which models handle which query types
+- Cache hit rates
+
+### Session View
+
+Click on any ticket ID to see the complete flow:
+1. Classification request (cheap, fast)
+2. Response generation (model selected based on complexity)
+3. Any retry attempts
+4. Total cost for the entire ticket
+
+### Cost Analysis
+
+Compare costs across complexity tiers:
+
+```
+Simple queries (gpt-4o-mini):
+  Average: $0.0002 per query
+  80% cache hit rate
+  Effective cost: $0.00004
+
+Complex queries (gpt-4o):
+  Average: $0.002 per query
+  40% cache hit rate
+  Effective cost: $0.0012
+
+Technical queries (claude-3.5-sonnet):
+  Average: $0.003 per query
+  20% cache hit rate
+  Effective cost: $0.0024
+```
+
+## Optimization Tips
+
+<AccordionGroup>
+  <Accordion title="Tune Classification" icon="bullseye">
+    Monitor which queries are misclassified:
+
+    ```typescript
+    headers: {
+      'Helicone-Property-User-Satisfaction': userRating,
+      'Helicone-Property-Correct-Classification': wasCorrect ? 'yes' : 'no',
+    }
+    ```
+
+    Then filter for incorrect classifications to improve your classifier.
+  </Accordion>
+
+  <Accordion title="Maximize Caching" icon="database">
+    Use temperature 0 and consistent prompts:
+
+    ```typescript
+    temperature: 0,
+    headers: {
+      'Helicone-Cache-Enabled': 'true',
+      'Helicone-Cache-Seed': 'support-v1', // Increment when changing prompts
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Add Feedback Loop" icon="arrows-rotate">
+    Collect user ratings to track quality:
+
+    ```typescript
+    // After user rates response
+    await fetch(`https://api.helicone.ai/v1/request/${requestId}/score`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${HELICONE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        scores: {
+          'user-rating': rating,
+          'resolved-issue': resolved ? 1 : 0,
+        },
+      }),
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Use Rate Limiting" icon="gauge-high">
+    Prevent abuse and control costs:
+
+    ```typescript
+    headers: {
+      'Helicone-RateLimit-Policy': '100;w=3600;s=user', // 100/hour per user
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Production Checklist
+
+Before deploying:
+
+- [ ] Set up Helicone alerts for errors and spending
+- [ ] Add rate limiting per user/session
+- [ ] Implement retry logic with exponential backoff
+- [ ] Enable caching with appropriate TTLs
+- [ ] Add user feedback collection
+- [ ] Configure logging for debugging
+- [ ] Test fallback behavior
+- [ ] Monitor classification accuracy
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Cost Tracking" icon="dollar-sign" href="/guides/cost-tracking">
+    Deep dive into cost optimization strategies
+  </Card>
+  <Card title="Agent Tracing" icon="diagram-project" href="/guides/agent-tracing">
+    Track more complex agent workflows
+  </Card>
+  <Card title="Structured Outputs" icon="code" href="/guides/tutorials/structured-outputs">
+    Add function calling for tool use
+  </Card>
+  <Card title="Caching Guide" icon="database" href="/features/advanced-usage/caching">
+    Maximize cache hit rates
+  </Card>
+</CardGroup>

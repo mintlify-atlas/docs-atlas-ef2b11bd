@@ -1,0 +1,167 @@
+---
+title: 'Self-Hosting Overview'
+description: 'Deploy Helicone on your own infrastructure with full control over your data'
+icon: 'server'
+---
+
+## Why Self-Host Helicone?
+
+Self-hosting Helicone gives you complete control over your LLM observability platform. Run it on your own infrastructure to meet compliance requirements, keep data private, or customize the deployment to your needs.
+
+<CardGroup cols={2}>
+  <Card title="Full Data Control" icon="shield-halved">
+    Your request logs, prompts, and analytics stay entirely within your infrastructure.
+  </Card>
+  <Card title="Easy Deployment" icon="rocket">
+    Get started with a single Docker command or deploy to Kubernetes with our Helm chart.
+  </Card>
+  <Card title="Open Source" icon="code-branch">
+    Apache 2.0 licensed. Inspect, modify, and contribute to the codebase.
+  </Card>
+  <Card title="Production Ready" icon="check-circle">
+    Battle-tested architecture powering thousands of production deployments.
+  </Card>
+</CardGroup>
+
+## Deployment Options
+
+### Docker (Recommended for Development)
+
+The fastest way to get Helicone running locally. Perfect for development, testing, or small production deployments.
+
+- **All-in-One Container**: Single container with all services
+- **Docker Compose**: Multi-container setup with separate services
+- **Minimal Requirements**: 4GB RAM, 2 CPU cores
+
+<Card title="Docker Setup" icon="docker" href="/self-hosting/docker">
+  Get started with Docker in under 5 minutes →
+</Card>
+
+### Kubernetes (Recommended for Production)
+
+Enterprise-grade deployment with auto-scaling, high availability, and advanced monitoring.
+
+- **Helm Chart**: Production-ready Kubernetes deployment
+- **Horizontal Scaling**: Scale services independently
+- **Enterprise Support**: Available for production deployments
+
+<Card title="Kubernetes Setup" icon="dharmachakra" href="/self-hosting/kubernetes">
+  Deploy to Kubernetes with Helm →
+</Card>
+
+## What Gets Deployed?
+
+Helicone consists of five core services:
+
+| Service | Purpose | Technology |
+|---------|---------|------------|
+| **Web** | Frontend dashboard and UI | Next.js |
+| **Jawn** | Backend API and request proxy | Express + TypeScript |
+| **Worker** | LLM proxy logging | Cloudflare Workers (Node.js) |
+| **Database** | Application data and auth | PostgreSQL |
+| **Analytics DB** | Request logs and metrics | ClickHouse |
+| **Object Storage** | Request/response bodies | MinIO (S3-compatible) |
+
+<Card title="Architecture Deep Dive" icon="diagram-project" href="/self-hosting/architecture">
+  Learn about Helicone's architecture →
+</Card>
+
+## System Requirements
+
+### Minimum (Development)
+
+- 4GB RAM
+- 2 CPU cores
+- 20GB storage
+- Docker 20.10+
+
+### Recommended (Production)
+
+- 16GB RAM
+- 4 CPU cores
+- 100GB+ storage (scales with usage)
+- Kubernetes 1.24+
+
+## Quick Start
+
+Get Helicone running locally in under 5 minutes:
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/Helicone/helicone.git
+    cd helicone/docker
+    ```
+  </Step>
+  
+  <Step title="Configure environment">
+    ```bash
+    cp .env.example .env
+    # Edit .env with your settings (optional for local dev)
+    ```
+  </Step>
+  
+  <Step title="Start Helicone">
+    ```bash
+    ./helicone-compose.sh helicone up
+    ```
+  </Step>
+  
+  <Step title="Access the dashboard">
+    Open [http://localhost:3000](http://localhost:3000) in your browser.
+    
+    Create your first user account via the Supabase auth UI at:
+    [http://localhost:54323/project/default/auth/users](http://localhost:54323/project/default/auth/users)
+  </Step>
+</Steps>
+
+## Available Ports
+
+When running locally, these ports are exposed:
+
+| Port | Service | Description |
+|------|---------|-------------|
+| `3000` | Web Dashboard | Frontend UI |
+| `8585` | Jawn API | Backend API and LLM proxy |
+| `8787` | Worker (OpenAI) | OpenAI proxy worker |
+| `8788` | Worker (API) | Helicone API worker |
+| `9000` | MinIO API | S3-compatible object storage |
+| `9001` | MinIO Console | MinIO admin interface |
+| `8123` | ClickHouse | Analytics database |
+| `5432` | PostgreSQL | Application database |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Docker Deployment" icon="docker" href="/self-hosting/docker">
+    Complete Docker setup guide with docker-compose
+  </Card>
+  <Card title="Kubernetes Deployment" icon="dharmachakra" href="/self-hosting/kubernetes">
+    Production deployment with Helm
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/self-hosting/architecture">
+    Understand how services work together
+  </Card>
+  <Card title="Configuration" icon="gear" href="/self-hosting/configuration">
+    Environment variables and advanced settings
+  </Card>
+</CardGroup>
+
+## Support
+
+<AccordionGroup>
+  <Accordion title="Where can I get help?">
+    - **Community Support**: Join our [Discord](https://discord.com/invite/zsSTcH2qhG) for community help
+    - **GitHub Issues**: Report bugs at [github.com/helicone/helicone](https://github.com/helicone/helicone/issues)
+    - **Enterprise Support**: Contact [enterprise@helicone.ai](mailto:enterprise@helicone.ai) for production support and SLAs
+  </Accordion>
+  
+  <Accordion title="Can I migrate from cloud to self-hosted?">
+    Yes! Export your data using our [API](https://docs.helicone.ai/rest/user/post-v1userquery) or [MCP server](https://docs.helicone.ai/integrations/tools/mcp), then import it into your self-hosted instance.
+  </Accordion>
+  
+  <Accordion title="What's the difference between the all-in-one image and docker-compose?">
+    - **All-in-one**: Single container with all services running via supervisord. Easiest to deploy but less flexible.
+    - **Docker Compose**: Separate containers for each service. Better for production, easier to scale and debug.
+  </Accordion>
+</AccordionGroup>

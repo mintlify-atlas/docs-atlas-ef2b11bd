@@ -1,0 +1,113 @@
+---
+title: "Query Users"
+sidebarTitle: "Query Users"
+description: "Retrieve aggregated user data based on user IDs and time filters"
+openapi: post /v1/user/query
+---
+
+This endpoint retrieves aggregated usage statistics for specific users. Use this to analyze user behavior, track token consumption, and calculate costs per user.
+
+## Use Cases
+
+- Analyze individual user behavior
+- Track token usage per user
+- Calculate per-user costs
+- Monitor user activity levels
+- Generate user-specific usage reports
+
+## Request Body
+
+<ParamField body="userIds" type="string[]">
+  Array of user IDs to query. If not provided, returns data for all users.
+</ParamField>
+
+<ParamField body="timeFilter" type="object">
+  Time range for filtering data
+  
+  <ParamField body="timeFilter.startTimeUnixSeconds" type="number" required>
+    Start time as Unix timestamp in seconds
+  </ParamField>
+  
+  <ParamField body="timeFilter.endTimeUnixSeconds" type="number" required>
+    End time as Unix timestamp in seconds
+  </ParamField>
+</ParamField>
+
+## Response
+
+Returns a Result object containing an array of user statistics.
+
+<ResponseField name="data" type="array">
+  Array of user statistics objects
+  
+  <ResponseField name="data[].user_id" type="string">
+    The user identifier
+  </ResponseField>
+  
+  <ResponseField name="data[].count" type="number">
+    Total number of requests made by the user
+  </ResponseField>
+  
+  <ResponseField name="data[].prompt_tokens" type="number">
+    Total prompt tokens consumed by the user
+  </ResponseField>
+  
+  <ResponseField name="data[].completion_tokens" type="number">
+    Total completion tokens generated for the user
+  </ResponseField>
+  
+  <ResponseField name="data[].cost" type="number">
+    Total cost in USD for the user's requests
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="error" type="string | null">
+  Error message if the request failed, null otherwise
+</ResponseField>
+
+## Example Request
+
+```bash
+curl --request POST \
+  --url https://api.helicone.ai/v1/user/query \
+  --header 'Authorization: Bearer <YOUR_API_KEY>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "userIds": ["user_123", "user_456"],
+    "timeFilter": {
+      "startTimeUnixSeconds": 1704067200,
+      "endTimeUnixSeconds": 1706745600
+    }
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "data": [
+    {
+      "user_id": "user_123",
+      "count": 250,
+      "prompt_tokens": 15000,
+      "completion_tokens": 12000,
+      "cost": 2.45
+    },
+    {
+      "user_id": "user_456",
+      "count": 180,
+      "prompt_tokens": 10500,
+      "completion_tokens": 8400,
+      "cost": 1.73
+    }
+  ],
+  "error": null
+}
+```
+
+## Notes
+
+- Results are limited to 100 users per request
+- User IDs must match the values passed in the `Helicone-User-Id` header during request logging
+- Costs are calculated based on the model pricing at the time of the request
+- If no timeFilter is provided, defaults to all time

@@ -1,0 +1,331 @@
+---
+title: "Observability Overview"
+sidebarTitle: "Overview"
+description: "Comprehensive observability for your LLM applications - monitor requests, track sessions, analyze metrics, and debug AI workflows"
+"twitter:title": "Observability - Helicone OSS LLM Observability"
+---
+
+import QuestionsSection from "/snippets/questions-section.mdx";
+
+Helicone provides a complete observability platform for LLM applications, giving you deep insights into how your AI systems perform in production. From individual request debugging to complex multi-step agent workflows, Helicone captures every detail you need to build reliable AI applications.
+
+## Why Observability Matters
+
+LLM applications are inherently complex and non-deterministic. Without proper observability, you're flying blind:
+
+- **Debug production issues** - Understand why specific requests failed or produced unexpected results
+- **Track agent workflows** - Visualize multi-step AI agent processes from start to finish
+- **Monitor performance** - Identify bottlenecks, latency issues, and cost spikes
+- **Analyze user behavior** - See how users interact with your AI features
+- **Optimize costs** - Track spending by user, feature, or workflow to control expenses
+
+## Core Observability Features
+
+<CardGroup cols={2}>
+<Card title="Requests" icon="file-lines" href="/observability/requests">
+View and query every LLM request with full request/response bodies, metadata, and performance metrics
+</Card>
+
+<Card title="Sessions" icon="diagram-project" href="/observability/sessions">
+Group related requests into sessions to trace complete AI agent workflows and multi-turn conversations
+</Card>
+
+<Card title="Traces" icon="bezier-curve" href="/observability/traces">
+Log custom traces for non-LLM operations like database queries, API calls, and tool executions
+</Card>
+
+<Card title="Metrics" icon="chart-line" href="/observability/metrics">
+Analyze aggregate metrics across requests, sessions, and users to understand system-wide performance
+</Card>
+
+<Card title="Custom Properties" icon="tags" href="/observability/custom-properties">
+Tag requests with metadata for filtering, segmentation, and cost analysis by any dimension
+</Card>
+
+<Card title="User Metrics" icon="users" href="/features/advanced-usage/user-metrics">
+Track per-user costs, usage patterns, and engagement metrics
+</Card>
+</CardGroup>
+
+## How It Works
+
+Helicone's observability system operates at multiple levels:
+
+### Request Level
+Every LLM request flows through Helicone, capturing:
+- Complete request and response bodies
+- Token counts and cost calculations
+- Latency and time-to-first-token metrics
+- Provider, model, and status information
+- Custom properties and metadata
+
+### Session Level
+Related requests are grouped using session headers:
+- Track multi-step agent workflows
+- Visualize parent-child request relationships
+- Analyze session-level metrics (total cost, duration, request count)
+- Debug complex conversation flows
+
+### Custom Traces
+Log non-LLM operations to get complete visibility:
+- Database queries and vector searches
+- API calls and external tool executions
+- Custom business logic and data processing
+- Any operation you want to track within your workflow
+
+## Quick Start
+
+<Steps>
+<Step title="Integrate Helicone">
+Route your LLM requests through Helicone's gateway or use the SDK:
+
+```typescript
+import { OpenAI } from "openai";
+
+const client = new OpenAI({
+  baseURL: "https://ai-gateway.helicone.ai",
+  apiKey: process.env.HELICONE_API_KEY,
+});
+
+const response = await client.chat.completions.create({
+  model: "gpt-4o-mini",
+  messages: [{ role: "user", content: "Hello!" }]
+});
+```
+</Step>
+
+<Step title="Add Custom Properties">
+Tag requests with metadata for filtering and analysis:
+
+```typescript
+const response = await client.chat.completions.create(
+  {
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Hello!" }]
+  },
+  {
+    headers: {
+      "Helicone-Property-Environment": "production",
+      "Helicone-Property-Feature": "chat",
+      "Helicone-User-Id": "user-123"
+    }
+  }
+);
+```
+</Step>
+
+<Step title="Track Sessions (Optional)">
+For multi-step workflows, add session headers:
+
+```typescript
+import { randomUUID } from "crypto";
+
+const sessionId = randomUUID();
+
+// First request in workflow
+await client.chat.completions.create(
+  { /* ... */ },
+  {
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Path": "/analyze",
+      "Helicone-Session-Name": "Document Analyzer"
+    }
+  }
+);
+
+// Follow-up request in same session
+await client.chat.completions.create(
+  { /* ... */ },
+  {
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Path": "/analyze/summary",
+      "Helicone-Session-Name": "Document Analyzer"
+    }
+  }
+);
+```
+</Step>
+
+<Step title="View in Dashboard">
+Visit [helicone.ai/requests](https://helicone.ai/requests) to see your data:
+- Filter by properties, model, date range, or status
+- Click into individual requests to see full details
+- View sessions to trace multi-step workflows
+- Analyze metrics and trends over time
+</Step>
+</Steps>
+
+## Common Observability Patterns
+
+### Debugging Production Issues
+
+```typescript
+// Add rich metadata to aid debugging
+const response = await client.chat.completions.create(
+  { /* request */ },
+  {
+    headers: {
+      "Helicone-Request-Id": "custom-request-id-123",
+      "Helicone-Property-Environment": "production",
+      "Helicone-Property-Version": "v2.1.0",
+      "Helicone-Property-RequestType": "user_query",
+      "Helicone-User-Id": "user-abc-123"
+    }
+  }
+);
+
+// Later, query by request ID or properties to find the issue
+```
+
+### Tracking Agent Workflows
+
+```typescript
+const sessionId = randomUUID();
+
+// Research phase
+await client.chat.completions.create(
+  { messages: [/* research query */] },
+  {
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Path": "/research",
+      "Helicone-Session-Name": "Research Agent"
+    }
+  }
+);
+
+// Analysis phase
+await client.chat.completions.create(
+  { messages: [/* analysis prompt */] },
+  {
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Path": "/research/analysis",
+      "Helicone-Session-Name": "Research Agent"
+    }
+  }
+);
+
+// View complete workflow in Sessions page
+```
+
+### Cost Monitoring by Feature
+
+```typescript
+// Tag all requests by feature
+const headers = {
+  "Helicone-Property-Feature": featureName,
+  "Helicone-Property-UserTier": userTier,
+  "Helicone-User-Id": userId
+};
+
+// Filter by properties in dashboard to see:
+// - Cost per feature
+// - Cost per user tier
+// - Cost per individual user
+```
+
+## Data Retention
+
+Helicone stores your observability data based on your plan:
+
+- **Free Plan**: 30 days of request data
+- **Pro Plan**: 90 days of request data
+- **Enterprise Plan**: Custom retention (up to unlimited)
+
+Request bodies can be optionally excluded for sensitive data:
+
+```typescript
+{
+  headers: {
+    "Helicone-Omit-Request": "true",  // Exclude request body
+    "Helicone-Omit-Response": "true"  // Exclude response body
+  }
+}
+```
+
+## Querying Your Data
+
+Access observability data programmatically via REST API:
+
+<CardGroup cols={2}>
+<Card title="Query Requests" icon="code" href="/rest/request/post-v1requestquery-clickhouse">
+Filter and export request data for analysis
+</Card>
+
+<Card title="Query Sessions" icon="diagram-project" href="/rest/session/post-v1sessionquery">
+Retrieve session data with all related requests
+</Card>
+
+<Card title="User Metrics" icon="users" href="/rest/user/post-v1usermetricsquery">
+Analyze per-user usage and costs
+</Card>
+
+<Card title="Custom Exports" icon="download" href="https://www.npmjs.com/package/@helicone/export">
+Export large datasets using our CLI tool
+</Card>
+</CardGroup>
+
+## Advanced Features
+
+### Real-time Monitoring
+- Live request feed in the dashboard
+- Webhook notifications for specific events
+- Alerts for errors, rate limits, or cost thresholds
+
+### Performance Analysis
+- Latency percentiles (p50, p95, p99)
+- Time-to-first-token tracking
+- Request rate and throughput metrics
+- Error rate monitoring by provider and model
+
+### Cost Optimization
+- Cost breakdowns by model, user, and feature
+- Token usage analysis and optimization suggestions
+- Budget alerts and spending limits
+- Cache hit rate tracking for cost savings
+
+## Privacy & Security
+
+Helicone takes data privacy seriously:
+
+- **Encryption**: All data encrypted in transit (TLS) and at rest
+- **Isolation**: Each organization's data is isolated
+- **Access Control**: Role-based access control for teams
+- **Compliance**: SOC 2 Type II compliant, GDPR ready
+- **Data Residency**: EU region available for GDPR compliance
+
+You can exclude sensitive data from logs:
+
+```typescript
+{
+  headers: {
+    "Helicone-Omit-Request": "true",
+    "Helicone-Omit-Response": "true"
+  }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+<Card title="View Requests" icon="file-lines" href="/observability/requests">
+Explore the Requests page and learn how to query your data
+</Card>
+
+<Card title="Track Sessions" icon="diagram-project" href="/observability/sessions">
+Group related requests into sessions for workflow tracking
+</Card>
+
+<Card title="Add Custom Properties" icon="tags" href="/observability/custom-properties">
+Tag requests with metadata for filtering and analysis
+</Card>
+
+<Card title="Analyze Metrics" icon="chart-line" href="/observability/metrics">
+Understand your system's performance with aggregate metrics
+</Card>
+</CardGroup>
+
+<QuestionsSection />

@@ -1,0 +1,461 @@
+---
+title: 'Alerts'
+description: 'Get notified via email or Slack when metrics exceed thresholds'
+---
+
+## Overview
+
+Helicone alerts monitor your AI application metrics and notify you when specific conditions are met. Set thresholds for cost, latency, errors, and custom metrics to stay informed about your system's health and prevent issues before they impact users.
+
+<Info>
+Alerts help you:
+- Monitor spending and prevent budget overruns
+- Detect performance degradation early
+- Track error rates and quality issues
+- Ensure SLAs are maintained
+- Get notified of unusual patterns
+</Info>
+
+## Key Benefits
+
+<CardGroup cols={2}>
+  <Card title="Flexible Metrics" icon="chart-line">
+    Alert on cost, latency, error rates, token usage, and custom properties
+  </Card>
+  <Card title="Smart Aggregation" icon="calculator">
+    Use sum, average, percentile, or count aggregations with time windows
+  </Card>
+  <Card title="Multi-Channel" icon="bell">
+    Receive notifications via email, Slack, or both
+  </Card>
+  <Card title="Advanced Filtering" icon="filter">
+    Apply filters to monitor specific users, models, or properties
+  </Card>
+</CardGroup>
+
+## Alert Types
+
+### Cost Alerts
+
+Monitor spending to stay within budget:
+
+```typescript
+{
+  "name": "Daily Cost Limit",
+  "metric": "cost",
+  "threshold": 100.0,
+  "aggregation": "sum",
+  "time_window": "1d",
+  "emails": ["finance@company.com"],
+  "slack_channels": ["#ai-budget"]
+}
+```
+
+### Latency Alerts
+
+Detect performance issues:
+
+```typescript
+{
+  "name": "High P95 Latency",
+  "metric": "latency",
+  "threshold": 5000,
+  "aggregation": "p95",
+  "percentile": 95,
+  "time_window": "1h",
+  "emails": ["oncall@company.com"],
+  "minimum_request_count": 100
+}
+```
+
+### Error Rate Alerts
+
+Monitor reliability:
+
+```typescript
+{
+  "name": "High Error Rate",
+  "metric": "error_rate",
+  "threshold": 0.05,  // 5% error rate
+  "aggregation": "average",
+  "time_window": "15m",
+  "slack_channels": ["#incidents"],
+  "minimum_request_count": 50
+}
+```
+
+### Token Usage Alerts
+
+Track token consumption:
+
+```typescript
+{
+  "name": "High Token Usage",
+  "metric": "total_tokens",
+  "threshold": 1000000,
+  "aggregation": "sum",
+  "time_window": "1h",
+  "emails": ["team@company.com"]
+}
+```
+
+## Creating Alerts
+
+### Via API
+
+```bash
+curl -X POST https://api.helicone.ai/v1/alert/create \
+  -H "Authorization: Bearer $HELICONE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Daily Cost Alert",
+    "metric": "cost",
+    "threshold": 100.0,
+    "aggregation": "sum",
+    "time_window": "1d",
+    "emails": ["admin@company.com"],
+    "slack_channels": [],
+    "minimum_request_count": 1
+  }'
+```
+
+### Via Dashboard
+
+<Steps>
+  <Step title="Navigate to Alerts">
+    Go to your [Helicone Dashboard](https://us.helicone.ai/alerts) and click **Alerts** in the sidebar.
+  </Step>
+  
+  <Step title="Create New Alert">
+    Click **Create Alert** and configure:
+    - Alert name
+    - Metric to monitor
+    - Threshold value
+    - Aggregation method
+    - Time window
+  </Step>
+  
+  <Step title="Configure Notifications">
+    Add email addresses and/or Slack channels to receive notifications.
+  </Step>
+  
+  <Step title="Set Filters (Optional)">
+    Apply filters to monitor specific segments:
+    - Model name
+    - User ID
+    - Custom properties
+    - Request path
+  </Step>
+  
+  <Step title="Save and Activate">
+    Review your configuration and save. The alert becomes active immediately.
+  </Step>
+</Steps>
+
+## Alert Configuration
+
+### Metrics
+
+| Metric | Description | Unit |
+|--------|-------------|------|
+| `cost` | Total cost of requests | USD |
+| `latency` | Request latency | milliseconds |
+| `error_rate` | Percentage of failed requests | decimal (0-1) |
+| `total_tokens` | Sum of input and output tokens | count |
+| `prompt_tokens` | Input tokens only | count |
+| `completion_tokens` | Output tokens only | count |
+| `request_count` | Number of requests | count |
+
+### Aggregation Methods
+
+| Method | Description | Use Case |
+|--------|-------------|----------|
+| `sum` | Total value in time window | Cost, token usage |
+| `average` | Mean value | Error rate, average latency |
+| `p50` | 50th percentile | Median latency |
+| `p75` | 75th percentile | Above-average latency |
+| `p95` | 95th percentile | Tail latency, outliers |
+| `p99` | 99th percentile | Worst-case latency |
+| `count` | Number of occurrences | Request volume |
+
+### Time Windows
+
+| Window | Format | Use Case |
+|--------|--------|----------|
+| 5 minutes | `5m` | Real-time monitoring |
+| 15 minutes | `15m` | Short-term trends |
+| 1 hour | `1h` | Hourly budgets |
+| 6 hours | `6h` | Business hours |
+| 1 day | `1d` | Daily budgets |
+| 1 week | `7d` | Weekly planning |
+
+## Advanced Configuration
+
+### Grouping
+
+Group alerts by dimension to get per-segment notifications:
+
+```typescript
+{
+  "name": "Cost per User",
+  "metric": "cost",
+  "threshold": 10.0,
+  "aggregation": "sum",
+  "time_window": "1d",
+  "grouping": "user",
+  "emails": ["admin@company.com"]
+}
+```
+
+**Supported grouping:**
+- `user` - Alert per user ID
+- `model` - Alert per model
+- Custom properties (e.g., `team`, `environment`)
+
+### Minimum Request Count
+
+Avoid false positives from low traffic:
+
+```typescript
+{
+  "name": "High Latency Alert",
+  "metric": "latency",
+  "threshold": 3000,
+  "aggregation": "p95",
+  "percentile": 95,
+  "time_window": "1h",
+  "minimum_request_count": 100,  // Only alert if 100+ requests
+  "emails": ["sre@company.com"]
+}
+```
+
+### Filters
+
+Monitor specific segments using filter expressions:
+
+```typescript
+{
+  "name": "Production Cost Alert",
+  "metric": "cost",
+  "threshold": 200.0,
+  "aggregation": "sum",
+  "time_window": "1d",
+  "filter": {
+    "properties": {
+      "environment": "production"
+    }
+  },
+  "emails": ["ops@company.com"]
+}
+```
+
+## Notification Channels
+
+### Email Notifications
+
+Add one or more email addresses:
+
+```typescript
+{
+  "emails": [
+    "admin@company.com",
+    "team@company.com",
+    "oncall@company.com"
+  ]
+}
+```
+
+**Email format:**
+```
+Subject: [Helicone Alert] Daily Cost Limit Exceeded
+
+Your alert "Daily Cost Limit" has been triggered.
+
+Metric: cost
+Threshold: $100.00
+Actual Value: $127.45
+Time Window: 1 day
+Time: 2024-03-10 14:32:00 UTC
+
+View details: https://us.helicone.ai/alerts/alert_123
+```
+
+### Slack Notifications
+
+Connect Slack workspace and specify channels:
+
+```typescript
+{
+  "slack_channels": [
+    "#alerts",
+    "#engineering",
+    "#incidents"
+  ]
+}
+```
+
+**Setup:**
+1. Install Helicone Slack app in your workspace
+2. Invite the bot to desired channels: `/invite @Helicone`
+3. Use channel names in alert configuration
+
+## Managing Alerts
+
+### List Alerts
+
+```bash
+curl https://api.helicone.ai/v1/alert/query \
+  -H "Authorization: Bearer $HELICONE_API_KEY"
+```
+
+**Response:**
+```json
+{
+  "data": {
+    "alerts": [
+      {
+        "id": "alert_123",
+        "name": "Daily Cost Alert",
+        "metric": "cost",
+        "threshold": 100.0,
+        "status": "active",
+        "created_at": "2024-03-10T10:00:00Z"
+      }
+    ],
+    "history": [
+      {
+        "id": "history_456",
+        "alert_id": "alert_123",
+        "alert_name": "Daily Cost Alert",
+        "status": "triggered",
+        "triggered_value": "127.45",
+        "alert_start_time": "2024-03-10T14:32:00Z",
+        "alert_end_time": null
+      }
+    ]
+  }
+}
+```
+
+### Delete Alert
+
+```bash
+curl -X DELETE https://api.helicone.ai/v1/alert/{alertId} \
+  -H "Authorization: Bearer $HELICONE_API_KEY"
+```
+
+## Common Alert Patterns
+
+<AccordionGroup>
+  <Accordion title="Budget protection">
+    Set multiple cost alerts with increasing urgency:
+
+    ```typescript
+    // Warning at 80% of budget
+    { threshold: 800, emails: ["team@company.com"] }
+
+    // Critical at 95% of budget
+    { threshold: 950, emails: ["admin@company.com"], slack_channels: ["#critical"] }
+
+    // Emergency at 100% of budget
+    { threshold: 1000, emails: ["ceo@company.com"], slack_channels: ["#emergency"] }
+    ```
+  </Accordion>
+
+  <Accordion title="SLA monitoring">
+    Track P95 latency to ensure performance SLAs:
+
+    ```typescript
+    {
+      "name": "SLA Breach - P95 Latency",
+      "metric": "latency",
+      "threshold": 2000,  // 2 second SLA
+      "aggregation": "p95",
+      "percentile": 95,
+      "time_window": "5m",
+      "minimum_request_count": 20
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Model-specific monitoring">
+    Alert on expensive models separately:
+
+    ```typescript
+    {
+      "name": "GPT-4 Daily Cost",
+      "metric": "cost",
+      "threshold": 50.0,
+      "aggregation": "sum",
+      "time_window": "1d",
+      "filter": {
+        "request": {
+          "model": { "equals": "gpt-4" }
+        }
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="User quota enforcement">
+    Track per-user usage:
+
+    ```typescript
+    {
+      "name": "User Quota Alert",
+      "metric": "request_count",
+      "threshold": 1000,
+      "aggregation": "count",
+      "time_window": "1d",
+      "grouping": "user",
+      "grouping_is_property": false
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+1. **Set meaningful thresholds**: Base thresholds on historical data and business requirements
+2. **Use minimum request counts**: Avoid noise from low-traffic periods
+3. **Layer alerts**: Create warning, critical, and emergency tiers
+4. **Monitor trends**: Use longer time windows to catch gradual increases
+5. **Test alerts**: Verify notification delivery before relying on alerts
+6. **Document runbooks**: Include action items for each alert type
+7. **Review regularly**: Adjust thresholds as usage patterns change
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Not receiving notifications">
+    - Verify email addresses and Slack channels are correct
+    - Check spam folders for email notifications
+    - Ensure Helicone bot is in Slack channels
+    - Confirm alert is active and not deleted
+  </Accordion>
+
+  <Accordion title="Too many false positives">
+    - Increase `minimum_request_count` to filter low-traffic noise
+    - Adjust threshold based on normal variance
+    - Use longer time windows for smoother trends
+    - Add filters to focus on relevant requests
+  </Accordion>
+
+  <Accordion title="Missing critical alerts">
+    - Lower threshold to catch issues earlier
+    - Use shorter time windows for faster detection
+    - Remove `minimum_request_count` if appropriate
+    - Verify filters aren't excluding relevant data
+  </Accordion>
+</AccordionGroup>
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card title="Webhooks" icon="webhook" href="/features/webhooks">
+    Build custom notification systems with real-time webhooks
+  </Card>
+  <Card title="Cost Tracking" icon="dollar-sign" href="/guides/cost-tracking">
+    Analyze spending patterns and optimize costs
+  </Card>
+</CardGroup>

@@ -1,0 +1,265 @@
+---
+title: "Introduction to Helicone"
+sidebarTitle: "Introduction"
+description: "Open-source AI Gateway and LLM observability platform for building production AI applications with reliability, visibility, and control"
+"twitter:title": "Introduction - Helicone Open Source LLM Observability"
+---
+
+![Helicone Platform](/images/helicone-og.webp)
+
+## What is Helicone?
+
+Helicone is an **open-source AI Gateway and LLM observability platform** that helps developers build production AI applications with complete visibility and reliability. We solve the hardest problems in production LLM applications: provider outages that break your app, unpredictable costs, and debugging issues that are impossible to reproduce.
+
+<CardGroup cols={2}>
+  <Card title="AI Gateway" icon="route">
+    Access 100+ LLM models through a unified OpenAI-compatible API with automatic fallbacks, intelligent routing, and 0% markup
+  </Card>
+  <Card title="Full Observability" icon="chart-line">
+    Complete visibility into every request with automatic cost tracking, latency monitoring, and session debugging
+  </Card>
+  <Card title="Open Source" icon="code-branch">
+    Apache 2.0 licensed and self-hostable. Your data stays under your control, always accessible
+  </Card>
+  <Card title="Production Ready" icon="shield">
+    SOC 2 and GDPR compliant with edge deployment for &lt;50ms overhead. Built for your worst day
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### 🌐 AI Gateway
+Access 100+ AI models with a single API key through our OpenAI-compatible gateway. Switch between OpenAI, Anthropic, Google, Groq, and more by just changing the model name. We handle intelligent routing, automatic fallbacks, and unified billing with 0% markup.
+
+### 🔍 LLM Observability
+Inspect and debug every request with automatic tracking of costs, latency, token usage, and errors. Trace multi-step AI workflows and agent sessions with full visibility into the reasoning chain.
+
+### 🎮 Prompt Management
+Version control your prompts and deploy changes without code updates. Test iterations in production, A/B test versions, and maintain full history of changes.
+
+### 💰 Cost & Usage Tracking
+Understand your unit economics with real-time cost tracking across all providers. Break down spending by user, feature, or any custom dimension. Set budgets and prevent surprise bills.
+
+### 🎛️ Smart Controls
+- **Caching**: Save costs and improve latency with automatic response caching
+- **Rate Limiting**: Protect your budget with per-user or global rate limits
+- **Automatic Fallbacks**: Stay online even when providers go down
+- **Security**: Built-in content moderation and LLM security
+
+## Who Uses Helicone?
+
+<CardGroup cols={3}>
+  <Card title="Startups" icon="rocket">
+    Move fast with instant observability. No need to build monitoring infrastructure from scratch.
+  </Card>
+  <Card title="Enterprises" icon="building">
+    Self-host for complete data control. SOC 2 compliant with enterprise Helm charts available.
+  </Card>
+  <Card title="AI Engineers" icon="code">
+    Debug complex agent workflows. Trace multi-step reasoning with session trees and full context.
+  </Card>
+</CardGroup>
+
+## Why Helicone?
+
+**Best Price Always**  
+We fight for every penny. 0% markup on credits means you pay exactly what providers charge. No hidden fees, no games.
+
+**Invisible Performance**  
+Your app shouldn't slow down for observability. Edge deployment keeps us under 50ms overhead. Always.
+
+**Always Online**  
+Your app stays up, period. Providers fail, we fallback. Rate limits hit, we load balance. We don't go down.
+
+**Never Be Surprised**  
+No shock bills. No mystery spikes. See every cost as it happens. We believe in radical transparency.
+
+**Built for Your Worst Day**  
+When production breaks at 3am and everyone's panicking, we're rock solid. Built for when you need us most.
+
+## Getting Started
+
+<Steps>
+  <Step title="Quick Start">
+    Get your first LLM request logged in under 2 minutes
+    
+    <Card title="Quick Start Guide" icon="bolt" href="/getting-started/quick-start">
+      Send your first request through the AI Gateway and see it logged in real-time
+    </Card>
+  </Step>
+
+  <Step title="Understand the Platform">
+    Learn how Helicone solves production AI challenges
+    
+    <Card title="Platform Overview" icon="compass" href="/getting-started/platform-overview">
+      Explore the architecture and see how the gateway, observability, and features work together
+    </Card>
+  </Step>
+
+  <Step title="Explore Features">
+    Go deeper with advanced capabilities
+    
+    <CardGroup cols={2}>
+      <Card title="Sessions & Agent Tracing" icon="git-branch" href="/features/sessions">
+        Debug multi-step AI workflows with full visibility
+      </Card>
+      <Card title="Prompt Management" icon="wand-magic-sparkles" href="/features/prompts">
+        Version and deploy prompts without code changes
+      </Card>
+      <Card title="Gateway Fallbacks" icon="shield" href="/getting-started/integration-method/gateway-fallbacks">
+        Automatic failover when providers go down
+      </Card>
+      <Card title="Cost Tracking" icon="chart-bar" href="/guides/cookbooks/cost-tracking">
+        Understand your LLM economics by user or feature
+      </Card>
+    </CardGroup>
+  </Step>
+</Steps>
+
+## Integration Methods
+
+Helicone works in two ways:
+
+<Tabs>
+  <Tab title="AI Gateway (Recommended)">
+    ### Use Credits for Instant Access
+    
+    Add credits to your Helicone account and access 100+ models without signing up for each provider. We manage the API keys and handle billing at cost (0% markup).
+    
+    **Benefits:**
+    - Single integration for all providers
+    - Switch models by just changing the name
+    - Automatic observability built-in
+    - No provider rate limits
+    - Unified billing
+    
+    ```typescript
+    import OpenAI from "openai";
+    
+    const client = new OpenAI({
+      baseURL: "https://ai-gateway.helicone.ai",
+      apiKey: process.env.HELICONE_API_KEY,
+    });
+    
+    // Use any model from any provider
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini", // or claude-sonnet-4, gemini-2.0-flash, etc.
+      messages: [{ role: "user", content: "Hello!" }],
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Bring Your Own Keys">
+    ### Use Your Provider Keys
+    
+    Configure your own API keys for OpenAI, Anthropic, and other providers at [Provider Keys](https://us.helicone.ai/providers). You manage billing directly with providers while getting full Helicone observability.
+    
+    **When to use:**
+    - You have existing provider relationships
+    - You need provider-specific features
+    - You want direct provider billing
+    
+    ```typescript
+    import OpenAI from "openai";
+    
+    const client = new OpenAI({
+      baseURL: "https://oai.helicone.ai/v1",
+      apiKey: process.env.OPENAI_API_KEY,
+      defaultHeaders: {
+        "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+      },
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Supported Providers
+
+Helicone integrates with **100+ LLM providers** including:
+
+<CardGroup cols={4}>
+  <Card title="OpenAI" icon="circle">
+    GPT-4o, GPT-4o-mini, o1, o3
+  </Card>
+  <Card title="Anthropic" icon="circle">
+    Claude Sonnet 4, Opus, Haiku
+  </Card>
+  <Card title="Google" icon="circle">
+    Gemini 2.0, Gemini Pro, Vertex AI
+  </Card>
+  <Card title="Groq" icon="circle">
+    Llama, Mixtral, Gemma
+  </Card>
+  <Card title="AWS Bedrock" icon="circle">
+    Claude, Llama, Titan
+  </Card>
+  <Card title="Azure OpenAI" icon="circle">
+    All Azure-hosted models
+  </Card>
+  <Card title="Together AI" icon="circle">
+    Open-source models
+  </Card>
+  <Card title="And More" icon="plus">
+    Mistral, DeepSeek, Perplexity, X.AI, Fireworks, and more
+  </Card>
+</CardGroup>
+
+See the [complete list of supported models](https://helicone.ai/models).
+
+## Framework Integrations
+
+Helicone works seamlessly with popular AI frameworks:
+
+- **LangChain** (JS/TS & Python) - Use AI Gateway for unified provider access
+- **LlamaIndex** (Python) - Full observability for data applications  
+- **LangGraph** (Python) - Track stateful multi-actor workflows
+- **Vercel AI SDK** (JS/TS) - Build AI-powered applications
+- **CrewAI** (Python) - Monitor role-playing AI agents
+
+See all [integrations in our docs](https://docs.helicone.ai/gateway/integrations/overview).
+
+## Open Source & Self-Hosting
+
+Helicone is **Apache 2.0 licensed** and fully open source. Self-host for complete data ownership and control.
+
+<CardGroup cols={2}>
+  <Card title="Docker Setup" icon="docker" href="/getting-started/self-host/docker">
+    Get started with Docker Compose in minutes
+  </Card>
+  <Card title="Helm Chart" icon="kubernetes">
+    Production-ready Kubernetes deployment (contact enterprise@helicone.ai)
+  </Card>
+</CardGroup>
+
+**GitHub:** [github.com/helicone/helicone](https://github.com/helicone/helicone)  
+**⭐ Star us** if you find Helicone useful!
+
+## Community & Support
+
+<CardGroup cols={2}>
+  <Card title="Discord Community" icon="discord" href="https://discord.com/invite/HwUbV3Q8qz">
+    Join 2000+ developers building with Helicone
+  </Card>
+  <Card title="Documentation" icon="book" href="/getting-started/quick-start">
+    Comprehensive guides and API references
+  </Card>
+  <Card title="Email Support" icon="envelope">
+    help@helicone.ai for questions and feedback
+  </Card>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/helicone/helicone/issues">
+    Report bugs and request features
+  </Card>
+</CardGroup>
+
+## What's Next?
+
+Ready to get started? Follow our quick start guide to log your first request in under 2 minutes.
+
+<Card
+  title="Quick Start Guide" 
+  href="/getting-started/quick-start"
+  icon="rocket"
+  horizontal
+>
+  Send your first LLM request through Helicone and see it logged in real-time
+</Card>

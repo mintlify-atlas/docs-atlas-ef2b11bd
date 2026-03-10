@@ -1,0 +1,351 @@
+---
+title: "Evaluation & Testing Overview"
+sidebarTitle: "Overview"
+description: "Build, evaluate, and improve your LLM applications with datasets, scores, and feedback"
+---
+
+Helicone provides a complete toolkit for evaluating and testing your LLM applications. Create datasets from production traffic, measure performance with custom scores, and collect user feedback to continuously improve your AI systems.
+
+## Why Evaluation Matters
+
+<CardGroup cols={2}>
+<Card title="Measure Quality" icon="chart-line">
+  Track accuracy, hallucination rates, and custom metrics across your LLM applications
+</Card>
+<Card title="Build Better Models" icon="brain">
+  Use production data to create training datasets and fine-tune models
+</Card>
+<Card title="Catch Regressions" icon="shield-check">
+  Test changes against consistent evaluation sets before deploying to production
+</Card>
+<Card title="Understand Users" icon="users">
+  Collect implicit and explicit feedback to learn what responses work best
+</Card>
+</CardGroup>
+
+## Evaluation Workflow
+
+Helicone's evaluation features work together to create a continuous improvement loop:
+
+<Steps>
+<Step title="Capture production data">
+  Log all LLM requests automatically with Helicone's proxy integration
+</Step>
+
+<Step title="Create datasets">
+  Select and curate high-quality examples from production traffic for evaluation and fine-tuning
+  
+  [Learn about Datasets →](/evaluation/datasets)
+</Step>
+
+<Step title="Score responses">
+  Run evaluation frameworks (RAGAS, LangSmith, custom) and report scores to Helicone for centralized tracking
+  
+  [Learn about Scores →](/evaluation/scores)
+</Step>
+
+<Step title="Collect feedback">
+  Gather user ratings and behavioral signals to identify what works
+  
+  [Learn about Feedback →](/evaluation/feedback)
+</Step>
+
+<Step title="Analyze and iterate">
+  Use evaluation data to refine prompts, switch models, and improve response quality
+</Step>
+</Steps>
+
+## Key Features
+
+### Datasets
+
+Transform production requests into curated datasets for evaluation and fine-tuning:
+
+- **Select from production**: Filter requests using custom properties, scores, or feedback ratings
+- **Curate quality examples**: Review and edit request/response pairs before adding to datasets
+- **Export multiple formats**: Download as JSONL for fine-tuning or CSV for analysis
+- **API integration**: Programmatically create and manage datasets
+
+```typescript
+// Create dataset from production traffic
+const response = await fetch('https://api.helicone.ai/v1/helicone-dataset', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${HELICONE_API_KEY}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    datasetName: 'Customer Support Examples',
+    requestIds: ['req_123', 'req_456', 'req_789']
+  })
+});
+```
+
+### Scores
+
+Report evaluation results from any framework for unified observability:
+
+- **Framework agnostic**: Works with RAGAS, LangSmith, or custom evaluation logic
+- **Track over time**: Visualize how metrics evolve across deployments
+- **Compare experiments**: Evaluate different prompts, models, or configurations
+- **Custom metrics**: Track any integer or boolean metric (accuracy, hallucination, safety)
+
+```typescript
+// Report evaluation scores
+await fetch(`https://api.helicone.ai/v1/request/${requestId}/score`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${HELICONE_API_KEY}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    scores: {
+      accuracy: 92,
+      hallucination: 5,
+      helpfulness: 88
+    }
+  })
+});
+```
+
+### Feedback
+
+Collect user satisfaction signals to understand response quality:
+
+- **Explicit ratings**: Thumbs up/down, star ratings from users
+- **Implicit signals**: Track acceptance, engagement, and behavioral patterns
+- **Production insights**: Learn what actually works for real users
+- **Dataset curation**: Use highly-rated responses for training examples
+
+```typescript
+// Submit user feedback
+await fetch(`https://api.helicone.ai/v1/request/${requestId}/feedback`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${HELICONE_API_KEY}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    rating: true  // true = positive, false = negative
+  })
+});
+```
+
+## Common Evaluation Patterns
+
+### RAG Evaluation with RAGAS
+
+Evaluate retrieval-augmented generation for accuracy and groundedness:
+
+```python
+from ragas import evaluate
+from ragas.metrics import Faithfulness, ResponseRelevancy
+import requests
+
+# Run RAGAS evaluation
+result = evaluate(dataset, metrics=[Faithfulness(), ResponseRelevancy()])
+
+# Report to Helicone
+response = requests.post(
+    f"https://api.helicone.ai/v1/request/{request_id}/score",
+    headers={"Authorization": f"Bearer {HELICONE_API_KEY}"},
+    json={
+        "scores": {
+            "faithfulness": int(result['faithfulness'] * 100),
+            "relevancy": int(result['answer_relevancy'] * 100)
+        }
+    }
+)
+```
+
+[View full RAGAS integration guide →](/guides/cookbooks/helicone-evals-with-ragas)
+
+### Replace Expensive Models
+
+Use production logs from premium models to fine-tune cheaper alternatives:
+
+<Steps>
+<Step title="Log premium model outputs">
+  Start logging successful requests from GPT-4, Claude Sonnet, or other expensive models
+</Step>
+
+<Step title="Create task-specific datasets">
+  Filter and curate examples for specific use cases (support, extraction, generation)
+</Step>
+
+<Step title="Fine-tune smaller models">
+  Export JSONL and train GPT-4o-mini, Gemini Flash, or other cost-effective models
+</Step>
+
+<Step title="Evaluate performance">
+  Compare fine-tuned model against original using consistent evaluation datasets
+</Step>
+
+<Step title="Deploy and iterate">
+  Continuously collect examples to improve the fine-tuned model
+</Step>
+</Steps>
+
+### Continuous Improvement Pipeline
+
+Build a data flywheel for ongoing model improvement:
+
+1. **Tag production traffic** with custom properties for segmentation
+2. **Score automatically** using evaluation frameworks or LLM-as-judge
+3. **Collect user feedback** through explicit ratings and implicit signals
+4. **Filter top performers** by combining scores and feedback ratings
+5. **Auto-curate datasets** with requests meeting quality thresholds
+6. **Retrain periodically** with new high-quality examples
+7. **A/B test improvements** before full deployment
+
+## Integration Examples
+
+<Tabs>
+<Tab title="Python">
+```python
+import openai
+import requests
+import uuid
+
+# Make request through Helicone
+client = openai.OpenAI(
+    api_key=os.environ["OPENAI_API_KEY"],
+    base_url="https://oai.helicone.ai/v1",
+    default_headers={
+        "Helicone-Auth": f"Bearer {os.environ['HELICONE_API_KEY']}"
+    }
+)
+
+request_id = str(uuid.uuid4())
+response = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[{"role": "user", "content": "Explain quantum computing"}],
+    extra_headers={"Helicone-Request-Id": request_id}
+)
+
+# Evaluate the response
+score = evaluate_response(response.choices[0].message.content)
+
+# Report score to Helicone
+requests.post(
+    f"https://api.helicone.ai/v1/request/{request_id}/score",
+    headers={"Authorization": f"Bearer {os.environ['HELICONE_API_KEY']}"},
+    json={"scores": {"quality": score}}
+)
+
+# Collect user feedback
+user_liked = get_user_feedback()
+requests.post(
+    f"https://api.helicone.ai/v1/request/{request_id}/feedback",
+    headers={"Authorization": f"Bearer {os.environ['HELICONE_API_KEY']}"},
+    json={"rating": user_liked}
+)
+```
+</Tab>
+
+<Tab title="TypeScript">
+```typescript
+import OpenAI from "openai";
+import { randomUUID } from "crypto";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: "https://oai.helicone.ai/v1",
+  defaultHeaders: {
+    "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+  },
+});
+
+// Make request
+const requestId = randomUUID();
+const response = await openai.chat.completions.create(
+  {
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Explain quantum computing" }],
+  },
+  {
+    headers: { "Helicone-Request-Id": requestId },
+  }
+);
+
+// Evaluate
+const score = await evaluateResponse(response.choices[0].message.content);
+
+// Report score
+await fetch(`https://api.helicone.ai/v1/request/${requestId}/score`, {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${process.env.HELICONE_API_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ scores: { quality: score } }),
+});
+
+// Collect feedback
+const userLiked = await getUserFeedback();
+await fetch(`https://api.helicone.ai/v1/request/${requestId}/feedback`, {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${process.env.HELICONE_API_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ rating: userLiked }),
+});
+```
+</Tab>
+</Tabs>
+
+## Best Practices
+
+<CardGroup cols={2}>
+<Card title="Start Small" icon="seedling">
+  Begin with 50-100 carefully curated examples rather than thousands of uncurated ones
+</Card>
+
+<Card title="Focus on Tasks" icon="bullseye">
+  Create task-specific datasets and metrics instead of general-purpose evaluations
+</Card>
+
+<Card title="Combine Signals" icon="layer-group">
+  Use automated scores AND user feedback for comprehensive quality assessment
+</Card>
+
+<Card title="Iterate Continuously" icon="arrows-rotate">
+  Build evaluation into your development workflow, not just during initial testing
+</Card>
+
+<Card title="Track Over Time" icon="chart-line">
+  Monitor metrics across deployments to catch regressions early
+</Card>
+
+<Card title="Test Before Deploy" icon="flask">
+  Evaluate prompt or model changes against consistent test sets
+</Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={3}>
+<Card title="Datasets" icon="database" href="/evaluation/datasets">
+  Create datasets from production traffic
+</Card>
+<Card title="Scores" icon="star" href="/evaluation/scores">
+  Track evaluation metrics and performance
+</Card>
+<Card title="Feedback" icon="comment" href="/evaluation/feedback">
+  Collect user satisfaction signals
+</Card>
+<Card title="RAGAS Integration" icon="book" href="/guides/cookbooks/helicone-evals-with-ragas">
+  Evaluate RAG applications with RAGAS
+</Card>
+<Card title="Experiments" icon="flask" href="/features/experiments">
+  Compare different configurations
+</Card>
+<Card title="API Reference" icon="code" href="/rest/evals/post-v1evalsquery">
+  View API documentation
+</Card>
+</CardGroup>
+
+---
+
+Evaluation is not a one-time task—it's an ongoing process. Start with basic metrics, build datasets from production, and continuously improve based on real-world performance.

@@ -1,0 +1,587 @@
+---
+title: "Evaluation Scores"
+sidebarTitle: "Scores"
+description: "Track evaluation metrics from any framework for centralized LLM observability"
+---
+
+Helicone Scores let you report evaluation results from any framework (RAGAS, LangSmith, custom evaluations) for centralized observability. Track accuracy, hallucination rates, helpfulness, and custom metrics across all your LLM applications.
+
+<Note>
+Helicone doesn't run evaluations for you—we provide a centralized location to report and analyze evaluation results from any framework, giving you unified observability across all your evaluation metrics.
+</Note>
+
+## Why Use Scores
+
+<CardGroup cols={2}>
+<Card title="Centralize Evaluation Results" icon="bullseye">
+  Report scores from any evaluation framework for unified monitoring and analysis
+</Card>
+<Card title="Track Performance Over Time" icon="chart-line">
+  Visualize how accuracy, hallucination rates, and other metrics evolve
+</Card>
+<Card title="Compare Experiments" icon="flask">
+  Evaluate different prompts, models, or configurations with consistent metrics
+</Card>
+<Card title="Catch Regressions" icon="shield-check">
+  Monitor metric trends to detect when changes negatively impact quality
+</Card>
+</CardGroup>
+
+## Quick Start
+
+<Steps>
+<Step title="Make a request and capture the ID">
+  Make your LLM request through Helicone and capture the request ID:
+
+  ```typescript
+  import OpenAI from "openai";
+  import { randomUUID } from "crypto";
+
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+    baseURL: "https://oai.helicone.ai/v1",
+    defaultHeaders: {
+      "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+    },
+  });
+
+  // Use custom request ID for tracking
+  const requestId = randomUUID();
+
+  const response = await openai.chat.completions.create(
+    {
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: "Explain quantum computing" }],
+    },
+    {
+      headers: { "Helicone-Request-Id": requestId },
+    }
+  );
+  ```
+</Step>
+
+<Step title="Run your evaluation">
+  Use your evaluation framework or custom logic to assess the response:
+
+  ```typescript
+  // Example: Custom evaluation logic
+  const scores = {
+    accuracy: evaluateAccuracy(response),      // Returns 0-100
+    hallucination: detectHallucination(response), // Returns 0-100
+    helpfulness: rateHelpfulness(response),    // Returns 0-100
+    is_safe: checkSafety(response)             // Returns boolean
+  };
+  ```
+</Step>
+
+<Step title="Report scores to Helicone">
+  Send evaluation results using the Helicone API:
+
+  ```typescript
+  await fetch(`https://api.helicone.ai/v1/request/${requestId}/score`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${process.env.HELICONE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      scores: {
+        accuracy: 92,
+        hallucination: 5,
+        helpfulness: 88,
+        is_safe: true
+      },
+    }),
+  });
+  ```
+</Step>
+
+<Step title="View analytics">
+  Analyze evaluation results in the Helicone dashboard to track performance trends, compare experiments, and identify areas for improvement.
+</Step>
+</Steps>
+
+<Warning>
+Scores are processed with a **10 minute delay** by default for analytics aggregation.
+</Warning>
+
+## API Format
+
+### Request Structure
+
+The scores API expects this format:
+
+```typescript
+POST https://api.helicone.ai/v1/request/{requestId}/score
+
+{
+  "scores": {
+    "metric_name": number | boolean,
+    "another_metric": number | boolean
+  }
+}
+```
+
+### Score Values
+
+| Type | Description | Example |
+|------|-------------|---------||
+| `integer` | Numeric scores (no decimals) | `92`, `85`, `0` |
+| `boolean` | Pass/fail or true/false metrics | `true`, `false` |
+
+<Warning>
+**Float values like `0.92` are rejected.** Convert to integers by multiplying by 100:
+- ❌ `0.92` → ✅ `92`
+- ❌ `0.08` → ✅ `8`
+</Warning>
+
+### Multiple Scores
+
+You can report multiple metrics in a single API call:
+
+```typescript
+const scores = {
+  // RAG metrics
+  faithfulness: 95,
+  answer_relevancy: 88,
+  context_precision: 92,
+  
+  // Quality metrics
+  accuracy: 90,
+  completeness: 85,
+  clarity: 93,
+  
+  // Safety metrics
+  is_safe: true,
+  is_appropriate: true,
+  contains_pii: false,
+  
+  // Performance metrics
+  response_time_ms: 1250,
+  token_efficiency: 87
+};
+
+await fetch(`https://api.helicone.ai/v1/request/${requestId}/score`, {
+  method: "POST",
+  headers: {
+    "Authorization": `Bearer ${HELICONE_API_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ scores }),
+});
+```
+
+## Integration Examples
+
+### RAGAS (RAG Evaluation)
+
+Evaluate retrieval-augmented generation for accuracy and hallucination:
+
+```python
+import requests
+from ragas import evaluate
+from ragas.metrics import Faithfulness, AnswerRelevancy, ContextPrecision
+from datasets import Dataset
+
+def evaluate_rag_response(question, answer, contexts, request_id):
+    # Initialize RAGAS metrics
+    metrics = [
+        Faithfulness(),
+        AnswerRelevancy(),
+        ContextPrecision()
+    ]
+    
+    # Create dataset in RAGAS format
+    data = {
+        "question": [question],
+        "answer": [answer],
+        "contexts": [contexts],
+        "ground_truth": [ground_truth]  # If available
+    }
+    dataset = Dataset.from_dict(data)
+    
+    # Run evaluation
+    result = evaluate(dataset, metrics=metrics)
+    
+    # Report to Helicone (convert 0-1 to 0-100)
+    response = requests.post(
+        f"https://api.helicone.ai/v1/request/{request_id}/score",
+        headers={
+            "Authorization": f"Bearer {HELICONE_API_KEY}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "scores": {
+                "faithfulness": int(result.get('faithfulness', 0) * 100),
+                "answer_relevancy": int(result.get('answer_relevancy', 0) * 100),
+                "context_precision": int(result.get('context_precision', 0) * 100)
+            }
+        }
+    )
+    
+    return result
+
+# Example usage
+scores = evaluate_rag_response(
+    question="What is the capital of France?",
+    answer="The capital of France is Paris.",
+    contexts=["France is a country in Europe. Paris is its capital."],
+    request_id="your-request-id-here"
+)
+```
+
+[View full RAGAS integration guide →](/guides/cookbooks/helicone-evals-with-ragas)
+
+### LLM-as-Judge
+
+Use a strong model to evaluate responses from another model:
+
+```typescript
+async function evaluateWithLLMJudge(
+  prompt: string,
+  response: string,
+  requestId: string
+) {
+  const judgePrompt = `
+Evaluate the following AI assistant response on these criteria (0-100):
+- Accuracy: Is the information correct?
+- Helpfulness: Does it address the user's question?
+- Clarity: Is it clear and well-structured?
+- Safety: Is it safe and appropriate?
+
+User Question: ${prompt}
+Assistant Response: ${response}
+
+Respond in JSON format:
+{
+  "accuracy": number,
+  "helpfulness": number,
+  "clarity": number,
+  "safety": number,
+  "reasoning": "brief explanation"
+}
+`;
+
+  const judgeResponse = await openai.chat.completions.create({
+    model: "gpt-4o",  // Use strong model as judge
+    messages: [{ role: "user", content: judgePrompt }],
+    response_format: { type: "json_object" }
+  });
+
+  const evaluation = JSON.parse(judgeResponse.choices[0].message.content);
+
+  // Report scores to Helicone
+  await fetch(`https://api.helicone.ai/v1/request/${requestId}/score`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${process.env.HELICONE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      scores: {
+        accuracy: evaluation.accuracy,
+        helpfulness: evaluation.helpfulness,
+        clarity: evaluation.clarity,
+        safety: evaluation.safety
+      },
+    }),
+  });
+
+  return evaluation;
+}
+```
+
+### Custom Evaluation Logic
+
+Implement domain-specific evaluation metrics:
+
+```typescript
+// Code generation evaluation
+async function evaluateCodeGeneration(
+  generatedCode: string,
+  requestId: string
+) {
+  const scores = {
+    // Syntax validity
+    syntax_valid: await validateSyntax(generatedCode) ? 100 : 0,
+    
+    // Test pass rate (0-100)
+    test_pass_rate: await runTests(generatedCode),
+    
+    // Code quality metrics
+    complexity: 100 - calculateCyclomaticComplexity(generatedCode),
+    readability: assessReadability(generatedCode),
+    
+    // Security checks
+    security_score: await runSecurityScan(generatedCode),
+    
+    // Boolean flags
+    follows_style_guide: checkStyleGuide(generatedCode),
+    has_documentation: hasDocStrings(generatedCode)
+  };
+
+  await fetch(`https://api.helicone.ai/v1/request/${requestId}/score`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${process.env.HELICONE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ scores }),
+  });
+
+  return scores;
+}
+```
+
+### Automated Evaluation Pipeline
+
+Automatically evaluate all requests using webhooks:
+
+```typescript
+// Set up webhook to trigger evaluation
+app.post('/webhook/helicone', async (req, res) => {
+  const { requestId, response, model } = req.body;
+
+  // Run evaluation asynchronously
+  evaluateRequest(requestId, response, model).catch(console.error);
+
+  res.status(200).send('OK');
+});
+
+async function evaluateRequest(
+  requestId: string,
+  response: any,
+  model: string
+) {
+  // Extract response text
+  const text = response.choices?.[0]?.message?.content;
+  if (!text) return;
+
+  // Run multiple evaluation methods
+  const [ragScore, safetyScore, qualityScore] = await Promise.all([
+    evaluateRAG(text),
+    evaluateSafety(text),
+    evaluateQuality(text)
+  ]);
+
+  // Combine scores
+  const scores = {
+    ...ragScore,
+    ...safetyScore,
+    ...qualityScore,
+    model_used: model
+  };
+
+  // Report to Helicone
+  await fetch(`https://api.helicone.ai/v1/request/${requestId}/score`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${process.env.HELICONE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ scores }),
+  });
+}
+```
+
+## Viewing and Analyzing Scores
+
+### Dashboard Analytics
+
+Helicone provides several ways to analyze your scores:
+
+1. **Request-level scores**: View scores for individual requests in the request detail page
+2. **Aggregate metrics**: See average, min, and max scores across all requests
+3. **Score distributions**: Understand the spread of scores with histogram visualizations
+4. **Time-based trends**: Track how scores change over time
+5. **Filtering**: Filter requests by score ranges (e.g., `accuracy > 90`)
+
+### Querying Scores via API
+
+Retrieve score analytics programmatically:
+
+```typescript
+// Get all score names
+const scoresResponse = await fetch(
+  'https://api.helicone.ai/v1/evals/scores',
+  {
+    headers: {
+      'Authorization': `Bearer ${HELICONE_API_KEY}`
+    }
+  }
+);
+const scoreNames = await scoresResponse.json();
+console.log('Available scores:', scoreNames);
+
+// Query score distributions
+const distributionResponse = await fetch(
+  'https://api.helicone.ai/v1/evals/score-distributions/query',
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${HELICONE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      filter: 'all',
+      timeFilter: {
+        start: '2024-01-01T00:00:00Z',
+        end: '2024-12-31T23:59:59Z'
+      }
+    })
+  }
+);
+const distributions = await distributionResponse.json();
+```
+
+## Use Cases
+
+### RAG Application Monitoring
+
+Track retrieval-augmented generation quality over time:
+
+```python
+# Evaluate every RAG request
+for request in production_requests:
+    # Run RAGAS evaluation
+    result = evaluate_rag(
+        question=request.question,
+        answer=request.answer,
+        contexts=request.contexts
+    )
+    
+    # Report to Helicone
+    report_scores(request.id, {
+        'faithfulness': int(result['faithfulness'] * 100),
+        'answer_relevancy': int(result['answer_relevancy'] * 100),
+        'context_recall': int(result['context_recall'] * 100)
+    })
+
+# Analyze trends in dashboard
+# - Are hallucinations increasing?
+# - Is retrieval quality improving?
+# - Which queries have low scores?
+```
+
+### Model Comparison
+
+Compare different models on the same evaluation dataset:
+
+```typescript
+const models = ['gpt-4o', 'gpt-4o-mini', 'claude-3-5-sonnet'];
+const testQuestions = [...]; // Your eval dataset
+
+for (const model of models) {
+  for (const question of testQuestions) {
+    // Make request
+    const response = await makeRequest(model, question);
+    
+    // Evaluate
+    const score = await evaluate(response);
+    
+    // Report with model tag
+    await reportScore(response.id, {
+      accuracy: score,
+      model: model  // Track which model
+    });
+  }
+}
+
+// Compare in dashboard:
+// - Filter by model property
+// - View average scores per model
+// - Identify which model performs best
+```
+
+### A/B Testing
+
+Test prompt changes before full rollout:
+
+```typescript
+// Split traffic between old and new prompt
+const useNewPrompt = Math.random() < 0.5;
+const prompt = useNewPrompt ? NEW_PROMPT : OLD_PROMPT;
+
+const response = await openai.chat.completions.create(
+  { messages: [{ role: 'user', content: prompt }] },
+  {
+    headers: {
+      'Helicone-Property-PromptVersion': useNewPrompt ? 'v2' : 'v1'
+    }
+  }
+);
+
+// Evaluate both versions
+const score = await evaluate(response);
+await reportScore(response.id, { accuracy: score });
+
+// After collecting data:
+// - Filter by PromptVersion property
+// - Compare average scores
+// - Roll out winning version
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+<Card title="Use Consistent Metrics" icon="ruler">
+  Define standard metrics across your team and use them consistently
+</Card>
+
+<Card title="Convert Decimals" icon="calculator">
+  Always convert decimal scores (0-1) to integers (0-100) before reporting
+</Card>
+
+<Card title="Name Clearly" icon="tag">
+  Use descriptive score names like `answer_relevancy` not `score1`
+</Card>
+
+<Card title="Track Context" icon="tags">
+  Use custom properties to segment scores by feature, model, or experiment
+</Card>
+
+<Card title="Automate Evaluation" icon="robot">
+  Set up automated evaluation pipelines rather than manual scoring
+</Card>
+
+<Card title="Monitor Trends" icon="chart-line">
+  Track scores over time to catch quality regressions early
+</Card>
+</CardGroup>
+
+## API Reference
+
+### Key Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/request/{requestId}/score` | POST | Submit scores for a request |
+| `/v1/evals/scores` | GET | Get all score names |
+| `/v1/evals/query` | POST | Query evaluation data |
+| `/v1/evals/score-distributions/query` | POST | Get score distributions |
+
+[View full API documentation →](/rest/request/post-v1request-score)
+
+## Related Features
+
+<CardGroup cols={2}>
+<Card title="Datasets" icon="database" href="/evaluation/datasets">
+  Create evaluation datasets from scored production traffic
+</Card>
+
+<Card title="Feedback" icon="comment" href="/evaluation/feedback">
+  Combine automated scores with user feedback for comprehensive quality assessment
+</Card>
+
+<Card title="Experiments" icon="flask" href="/features/experiments">
+  Compare different configurations with consistent scoring
+</Card>
+
+<Card title="Custom Properties" icon="tag" href="/features/advanced-usage/custom-properties">
+  Segment scores by feature, model, or experiment
+</Card>
+</CardGroup>
+
+---
+
+Scores provide objective measurement of LLM response quality. Start with simple metrics like accuracy or helpfulness, then expand to framework-specific evaluations as your needs grow.

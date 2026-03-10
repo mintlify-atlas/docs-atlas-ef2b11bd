@@ -1,0 +1,402 @@
+---
+title: "Prompt Deployment"
+description: "Deploy prompt versions to environments and use them through the SDK or AI Gateway"
+icon: "rocket"
+---
+
+Deploy prompt versions to different environments (production, staging, custom) and access them through the `@helicone/prompts` SDK or directly via the Helicone AI Gateway.
+
+## Deployment Environments
+
+Environments let you deploy different prompt versions for different use cases:
+
+<CardGroup cols={3}>
+  <Card title="Production" icon="check-circle">
+    The live version that serves real user traffic. Deploy stable, tested versions here.
+  </Card>
+  <Card title="Staging" icon="flask">
+    Pre-production testing environment. Validate changes before going live.
+  </Card>
+  <Card title="Custom" icon="gear">
+    Create any environment: `dev`, `qa`, `canary`, `feature-branch`, etc.
+  </Card>
+</CardGroup>
+
+### Environment Properties
+
+- One version can be deployed to **multiple environments**
+- Multiple versions can be deployed to **different environments** simultaneously
+- Default environment is `production`
+- Environment names are case-sensitive
+- No predefined environment limits - create as many as needed
+
+## Deploying in the UI
+
+<Steps>
+  <Step title="Select a version">
+    Open your prompt and navigate to the **Versions** tab. Select the version you want to deploy.
+  </Step>
+  
+  <Step title="Choose environment">
+    Click **Deploy** and select or create an environment:
+    - Select existing: `production`, `staging`, etc.
+    - Create new: Enter a custom environment name
+  </Step>
+  
+  <Step title="Confirm deployment">
+    Click **Deploy to [environment]** to activate the version.
+  </Step>
+</Steps>
+
+The version is immediately available in your code when accessing that environment.
+
+## Deploying via API
+
+### Deploy to Environment
+
+```bash
+curl -X POST https://api.helicone.ai/v1/prompt-2025/update/environment \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "promptId": "abc123",
+    "promptVersionId": "5d4ec7d7-5725-46c2-ad26-41ddf6287527",
+    "environment": "production"
+  }'
+```
+
+### Remove from Environment
+
+```bash
+curl -X POST https://api.helicone.ai/v1/prompt-2025/remove/environment \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "promptId": "abc123",
+    "promptVersionId": "5d4ec7d7-5725-46c2-ad26-41ddf6287527",
+    "environment": "staging"
+  }'
+```
+
+## Using Deployed Prompts
+
+### SDK Integration
+
+The `@helicone/prompts` SDK is the recommended way to use prompts in your application.
+
+#### Installation
+
+```bash
+npm install @helicone/prompts
+```
+
+#### Basic Usage
+
+```typescript
+import { HeliconePromptManager } from "@helicone/prompts";
+import { OpenAI } from "openai";
+
+const promptManager = new HeliconePromptManager({
+  apiKey: process.env.HELICONE_API_KEY!,
+  baseUrl: "https://api.helicone.ai", // Optional, defaults to this
+});
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY!,
+});
+
+// Fetch the production version
+const { body, errors } = await promptManager.getPromptBody({
+  prompt_id: "abc123",
+  environment: "production", // Optional, defaults to production
+  inputs: {
+    userName: "Alice",
+    topic: "machine learning",
+  },
+});
+
+if (errors.length > 0) {
+  console.error("Variable validation errors:", errors);
+}
+
+// Use with OpenAI
+const response = await openai.chat.completions.create(body);
+```
+
+#### Environment Selection
+
+```typescript
+// Production (default)
+const prod = await promptManager.getPromptBody({
+  prompt_id: "abc123",
+  inputs: { userName: "Alice" },
+});
+
+// Staging
+const staging = await promptManager.getPromptBody({
+  prompt_id: "abc123",
+  environment: "staging",
+  inputs: { userName: "Alice" },
+});
+
+// Custom environment
+const custom = await promptManager.getPromptBody({
+  prompt_id: "abc123",
+  environment: "feature-branch-123",
+  inputs: { userName: "Alice" },
+});
+```
+
+#### Specific Version
+
+Bypass environment deployment and use a specific version directly:
+
+```typescript
+const { body } = await promptManager.getPromptBody({
+  prompt_id: "abc123",
+  version_id: "5d4ec7d7-5725-46c2-ad26-41ddf6287527",
+  inputs: { userName: "Alice" },
+});
+```
+
+### AI Gateway Integration
+
+Use prompts directly through the Helicone AI Gateway without the SDK.
+
+#### Setup
+
+```typescript
+import { OpenAI } from "openai";
+
+const client = new OpenAI({
+  baseURL: "https://ai-gateway.helicone.ai",
+  apiKey: process.env.HELICONE_API_KEY,
+});
+```
+
+#### Using Prompts
+
+```typescript
+const response = await client.chat.completions.create({
+  model: "gpt-4o-mini",
+  // Prompt reference
+  prompt_id: "abc123",
+  environment: "production", // Optional
+  inputs: {
+    userName: "Alice",
+    topic: "AI safety",
+  },
+  // Optional: Add additional messages
+  messages: [
+    { role: "user", content: "Follow-up question here" },
+  ],
+});
+```
+
+The gateway:
+1. Fetches the prompt from the specified environment
+2. Substitutes variables with your `inputs`
+3. Merges with any additional `messages` you provide
+4. Routes to the appropriate LLM provider
+5. Returns the response
+
+## Variables and Inputs
+
+Prompts can include typed variables using the syntax `{{hc:variableName:type}}`.
+
+### Supported Types
+
+- `string`: Text values
+- `number`: Numeric values
+- `boolean`: True/false values
+
+### Example Prompt
+
+```
+You are a helpful assistant for {{hc:companyName:string}}.
+
+User {{hc:userName:string}} has asked about {{hc:topic:string}}.
+Their account is {{hc:isPremium:boolean}} premium.
+```
+
+### Providing Inputs
+
+```typescript
+const { body, errors } = await promptManager.getPromptBody({
+  prompt_id: "abc123",
+  environment: "production",
+  inputs: {
+    companyName: "Acme Corp",
+    userName: "Alice",
+    topic: "billing",
+    isPremium: true,
+  },
+});
+```
+
+### Type Validation
+
+The SDK validates input types at runtime:
+
+```typescript
+const { body, errors } = await promptManager.getPromptBody({
+  prompt_id: "abc123",
+  inputs: {
+    userName: "Alice",
+    isPremium: "yes", // Error: expected boolean
+  },
+});
+
+if (errors.length > 0) {
+  console.error("Validation errors:", errors);
+  // [
+  //   {
+  //     variable: "isPremium",
+  //     expected: "boolean",
+  //     value: "yes"
+  //   }
+  // ]
+}
+```
+
+## Advanced Usage
+
+### Merging Messages
+
+Append additional messages to the prompt:
+
+```typescript
+const { body } = await promptManager.getPromptBody({
+  prompt_id: "abc123",
+  environment: "production",
+  inputs: { userName: "Alice" },
+  messages: [
+    {
+      role: "user",
+      content: "What are the latest updates?",
+    },
+  ],
+});
+
+// Resulting body contains:
+// - Prompt messages with variables substituted
+// - Appended user message
+```
+
+### Overriding Parameters
+
+Override prompt parameters at runtime:
+
+```typescript
+const { body } = await promptManager.getPromptBody({
+  prompt_id: "abc123",
+  environment: "production",
+  inputs: { userName: "Alice" },
+  temperature: 0.9, // Override default
+  max_tokens: 500,  // Override default
+});
+```
+
+### Streaming Responses
+
+```typescript
+import { OpenAI } from "openai";
+
+const { body } = await promptManager.getPromptBody({
+  prompt_id: "abc123",
+  environment: "production",
+  inputs: { userName: "Alice" },
+});
+
+const stream = await openai.chat.completions.create({
+  ...body,
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0]?.delta?.content || "");
+}
+```
+
+## Deployment Strategies
+
+### Blue-Green Deployment
+
+1. Deploy new version to `staging`
+2. Test thoroughly
+3. Deploy to `production`
+4. Monitor metrics
+5. Rollback if needed (redeploy previous version)
+
+### Canary Deployment
+
+1. Deploy new version to `canary` environment
+2. Route 5-10% of traffic to canary
+3. Monitor error rates and quality
+4. Gradually increase traffic
+5. Promote to `production` when confident
+
+### Feature Branch Testing
+
+1. Create environment named after feature branch: `feature-new-tone`
+2. Deploy experimental version
+3. Test in isolation
+4. Promote to `staging` when ready
+
+## Monitoring Deployments
+
+Track prompt usage and performance in the Helicone dashboard:
+
+- **Requests per version**: See which versions are active
+- **Environment usage**: Monitor traffic by environment
+- **Error rates**: Detect issues with new deployments
+- **Cost per version**: Track spending changes
+- **Latency**: Measure performance impact
+
+## Best Practices
+
+<Check>**Test in staging first**: Always validate in non-production before deploying to production</Check>
+
+<Check>**Use semantic versioning**: Major versions for breaking changes, minor for improvements</Check>
+
+<Check>**Monitor after deployment**: Watch error rates and user feedback for 24-48 hours</Check>
+
+<Check>**Keep environment names consistent**: Use standardized names across projects</Check>
+
+<Warning>**Avoid frequent production changes**: Deploy to production intentionally, not constantly</Warning>
+
+<Warning>**Don't delete deployed versions**: Keep versions that are or were in production for rollback</Warning>
+
+## Troubleshooting
+
+### Version Not Found
+
+If the SDK returns "version not found":
+- Verify the prompt ID is correct
+- Check that the version is deployed to the specified environment
+- Ensure your API key has access to the organization
+
+### Variable Validation Errors
+
+If you receive validation errors:
+- Check that all required variables have inputs
+- Verify input types match variable declarations
+- Review the `errors` array for specific issues
+
+### Gateway Integration Issues
+
+If prompts aren't working through the gateway:
+- Confirm `baseURL` is set to `https://ai-gateway.helicone.ai`
+- Verify `prompt_id` is correct
+- Check that the environment exists and has a deployed version
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Experiments" icon="flask" href="/prompts/experiments">
+    Compare prompt versions with A/B testing
+  </Card>
+  <Card title="Gateway" icon="network-wired" href="/gateway/overview">
+    Learn more about the Helicone AI Gateway
+  </Card>
+</CardGroup>

@@ -1,0 +1,130 @@
+---
+title: "Query Evaluations"
+sidebarTitle: "Query Evaluations"
+description: "Search and filter through evaluation results with advanced filtering capabilities"
+openapi: post /v1/evals/query
+---
+
+This endpoint allows you to query and retrieve evaluation data for your requests. Use filters to narrow down results by specific criteria and time ranges.
+
+## Use Cases
+
+- Retrieve evaluation scores for analysis
+- Filter evaluations by time period
+- Get evaluation metrics for specific requests
+- Monitor evaluation trends over time
+
+## Request Body
+
+The request accepts an `EvalQueryParams` object with the following structure:
+
+<ParamField body="filter" type="EvalFilterNode" required>
+  Filter criteria for evaluations. Can be "all" to retrieve all evaluations, or a filter tree structure to specify conditions.
+</ParamField>
+
+<ParamField body="timeFilter" type="object" required>
+  Time range for filtering evaluations.
+  
+  <ParamField body="timeFilter.start" type="string" required>
+    Start time in ISO 8601 format (e.g., "2024-01-01T00:00:00Z")
+  </ParamField>
+  
+  <ParamField body="timeFilter.end" type="string" required>
+    End time in ISO 8601 format (e.g., "2024-01-31T23:59:59Z")
+  </ParamField>
+</ParamField>
+
+<ParamField body="offset" type="number">
+  Number of records to skip for pagination (default: 0)
+</ParamField>
+
+<ParamField body="limit" type="number">
+  Maximum number of records to return (default: 100)
+</ParamField>
+
+<ParamField body="timeZoneDifference" type="number">
+  Time zone difference in minutes from UTC
+</ParamField>
+
+## Response
+
+Returns a Result object containing an array of Eval objects.
+
+<ResponseField name="data" type="Eval[]">
+  Array of evaluation objects
+  
+  <ResponseField name="data[].name" type="string">
+    Name of the evaluation metric
+  </ResponseField>
+  
+  <ResponseField name="data[].averageScore" type="number">
+    Average score across all evaluations
+  </ResponseField>
+  
+  <ResponseField name="data[].minScore" type="number">
+    Minimum score recorded
+  </ResponseField>
+  
+  <ResponseField name="data[].maxScore" type="number">
+    Maximum score recorded
+  </ResponseField>
+  
+  <ResponseField name="data[].count" type="number">
+    Total number of evaluations
+  </ResponseField>
+  
+  <ResponseField name="data[].overTime" type="array">
+    Count of evaluations over time
+  </ResponseField>
+  
+  <ResponseField name="data[].averageOverTime" type="array">
+    Average scores over time
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="error" type="string | null">
+  Error message if the request failed, null otherwise
+</ResponseField>
+
+## Example Request
+
+```bash
+curl --request POST \
+  --url https://api.helicone.ai/v1/evals/query \
+  --header 'Authorization: Bearer <YOUR_API_KEY>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "filter": "all",
+    "timeFilter": {
+      "start": "2024-01-01T00:00:00Z",
+      "end": "2024-01-31T23:59:59Z"
+    },
+    "offset": 0,
+    "limit": 100
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "data": [
+    {
+      "name": "accuracy",
+      "averageScore": 0.85,
+      "minScore": 0.65,
+      "maxScore": 0.98,
+      "count": 150,
+      "overTime": [
+        { "date": "2024-01-01", "count": 10 },
+        { "date": "2024-01-02", "count": 15 }
+      ],
+      "averageOverTime": [
+        { "date": "2024-01-01", "value": 0.82 },
+        { "date": "2024-01-02", "value": 0.87 }
+      ]
+    }
+  ],
+  "error": null
+}
+```

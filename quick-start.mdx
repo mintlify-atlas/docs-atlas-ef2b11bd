@@ -1,0 +1,404 @@
+---
+title: "Quick Start"
+sidebarTitle: "Quick Start"
+description: "Get your first LLM request logged with Helicone in under 2 minutes using the AI Gateway"
+"twitter:title": "Quick Start - Helicone Open Source LLM Observability"
+---
+
+Use the familiar OpenAI SDK to access 100+ LLM models across OpenAI, Anthropic, Google, and more with automatic logging, observability, and fallbacks built in.
+
+<Steps>
+  <Step title="Create your account">
+    
+    ### Sign up for Helicone
+    
+    1. [Sign up for free](https://helicone.ai/signup) (10,000 requests/month on the free tier)
+    2. Complete the onboarding flow
+    3. Generate your Helicone API key at [API Keys](https://us.helicone.ai/settings/api-keys)
+    
+    <Note>
+    **Free tier includes:** 10K requests/month, all core features, and no credit card required
+    </Note>
+
+  </Step>
+
+  <Step title="Add credits (optional)">
+    
+    ### Use the AI Gateway with credits
+    
+    For the easiest experience, add credits to access 100+ models without signing up for each provider:
+    
+    1. Go to [helicone.ai/credits](https://us.helicone.ai/credits)
+    2. Add funds to your account (we charge exactly what providers charge - 0% markup)
+    3. Use any model from any provider with a single API key
+    
+    <Accordion title="What are credits?">
+      Instead of managing API keys for each provider (OpenAI, Anthropic, Google, etc.), Helicone maintains the keys for you. You simply add credits to your account, and we handle the rest.
+
+      **Benefits:**
+      - **0% markup** - Pay exactly what providers charge, no hidden fees
+      - No need to sign up for multiple LLM providers
+      - Switch between [100+ models](https://helicone.ai/models) by just changing the model name
+      - Automatic fallbacks if a provider is down
+      - Unified billing across all providers
+
+      Want more control? You can [bring your own provider keys](https://us.helicone.ai/providers) instead.
+    </Accordion>
+    
+    <Accordion title="Already have provider keys?">
+      Skip this step and use your own API keys for OpenAI, Anthropic, or other providers. Configure them at [Provider Keys](https://us.helicone.ai/providers).
+      
+      You'll still get full observability, but you'll manage provider relationships directly. See the "Bring Your Own Keys" tab in Step 3.
+    </Accordion>
+
+  </Step>
+
+  <Step title="Send your first request">
+    
+    ### Choose your integration method
+    
+    Helicone's AI Gateway is OpenAI-compatible, so you can use the OpenAI SDK with any provider.
+    
+    <Tabs>
+      <Tab title="TypeScript (Credits)">
+        Using Helicone credits to access any model:
+        
+        ```typescript
+        import OpenAI from "openai";
+
+        const client = new OpenAI({
+          baseURL: "https://ai-gateway.helicone.ai",
+          apiKey: process.env.HELICONE_API_KEY, // Your Helicone API key
+        });
+
+        const response = await client.chat.completions.create({
+          model: "gpt-4o-mini", // Or any of 100+ models
+          messages: [
+            { role: "user", content: "Explain Helicone in one sentence" }
+          ],
+        });
+
+        console.log(response.choices[0].message.content);
+        ```
+        
+        **Switch providers instantly:**
+        ```typescript
+        // OpenAI
+        model: "gpt-4o-mini"
+        
+        // Anthropic
+        model: "claude-sonnet-4"
+        
+        // Google
+        model: "gemini-2.0-flash"
+        
+        // Groq
+        model: "llama-3.3-70b-versatile"
+        ```
+      </Tab>
+      
+      <Tab title="Python (Credits)">
+        Using Helicone credits to access any model:
+        
+        ```python
+        from openai import OpenAI
+        import os
+
+        client = OpenAI(
+            base_url="https://ai-gateway.helicone.ai",
+            api_key=os.getenv("HELICONE_API_KEY")  # Your Helicone API key
+        )
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",  # Or any of 100+ models
+            messages=[
+                {"role": "user", "content": "Explain Helicone in one sentence"}
+            ]
+        )
+
+        print(response.choices[0].message.content)
+        ```
+        
+        **Switch providers instantly:**
+        ```python
+        # OpenAI
+        model="gpt-4o-mini"
+        
+        # Anthropic
+        model="claude-sonnet-4"
+        
+        # Google  
+        model="gemini-2.0-flash"
+        
+        # Groq
+        model="llama-3.3-70b-versatile"
+        ```
+      </Tab>
+      
+      <Tab title="cURL (Credits)">
+        Using Helicone credits to access any model:
+        
+        ```bash
+        curl https://ai-gateway.helicone.ai/chat/completions \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $HELICONE_API_KEY" \
+          -d '{
+            "model": "gpt-4o-mini",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Explain Helicone in one sentence"
+              }
+            ]
+          }'
+        ```
+        
+        **Switch providers by changing the model:**
+        ```bash
+        # Anthropic Claude
+        "model": "claude-sonnet-4"
+        
+        # Google Gemini
+        "model": "gemini-2.0-flash"
+        
+        # Groq Llama
+        "model": "llama-3.3-70b-versatile"
+        ```
+      </Tab>
+
+      <Tab title="Bring Your Own Keys">
+        Using your own OpenAI API key with Helicone observability:
+        
+        **TypeScript:**
+        ```typescript
+        import OpenAI from "openai";
+
+        const client = new OpenAI({
+          baseURL: "https://oai.helicone.ai/v1",
+          apiKey: process.env.OPENAI_API_KEY, // Your OpenAI key
+          defaultHeaders: {
+            "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+          },
+        });
+
+        const response = await client.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [{ role: "user", content: "Hello, world!" }],
+        });
+        ```
+        
+        **Python:**
+        ```python
+        from openai import OpenAI
+        import os
+
+        client = OpenAI(
+            base_url="https://oai.helicone.ai/v1",
+            api_key=os.getenv("OPENAI_API_KEY"),  # Your OpenAI key
+            default_headers={
+                "Helicone-Auth": f"Bearer {os.getenv('HELICONE_API_KEY')}"
+            }
+        )
+        ```
+        
+        **Other providers:** See [integration guides](/gateway/integrations/overview) for Anthropic, Azure, Bedrock, and more.
+      </Tab>
+    </Tabs>
+
+  </Step>
+
+  <Step title="View your logs">
+    
+    ### See your request in the dashboard
+    
+    Once you run the code, you'll see your request appear in the [Requests tab](https://us.helicone.ai/requests) within seconds.
+    
+    <Frame>
+      <img 
+        src="/images/introduction/intro-dashboard.webp" 
+        alt="Helicone dashboard showing request logs with cost, latency, and full details"
+      />
+    </Frame>
+    
+    **What you'll see:**
+    - Full request and response details
+    - Token usage (input, output, cached)
+    - Exact cost per request
+    - Latency and processing time
+    - Model and provider information
+    - Custom properties and user tracking
+    
+    <Tip>
+    Click any request to see the complete conversation, including all messages, tokens, costs, and metadata.
+    </Tip>
+
+  </Step>
+</Steps>
+
+## You're All Set! 🎉
+
+Congratulations! You've successfully integrated Helicone and logged your first LLM request. Now let's explore what you can do with the platform.
+
+## What's Next?
+
+<CardGroup cols={2}>
+  <Card
+    title="Understand the Platform" 
+    href="/getting-started/platform-overview"
+    icon="compass"
+  >
+    Learn how Helicone solves production AI challenges with architecture overview
+  </Card>
+  
+  <Card
+    title="Track Sessions & Agents" 
+    href="/features/sessions"
+    icon="git-branch"
+  >
+    Debug multi-step AI workflows with session trees and full visibility
+  </Card>
+  
+  <Card
+    title="Add Custom Properties" 
+    href="/features/advanced-usage/custom-properties"
+    icon="tag"
+  >
+    Segment requests by user, feature, or environment for better insights
+  </Card>
+  
+  <Card
+    title="Set Up Fallbacks" 
+    href="/getting-started/integration-method/gateway-fallbacks"
+    icon="shield"
+  >
+    Configure automatic failover when providers go down
+  </Card>
+  
+  <Card
+    title="Manage Prompts" 
+    href="/features/prompts"
+    icon="wand-magic-sparkles"
+  >
+    Version control prompts and deploy without code changes
+  </Card>
+  
+  <Card
+    title="Cost Tracking" 
+    href="/guides/cookbooks/cost-tracking"
+    icon="dollar-sign"
+  >
+    Understand your LLM economics and optimize spending
+  </Card>
+</CardGroup>
+
+## Common Use Cases
+
+<AccordionGroup>
+  <Accordion title="How do I track costs by user?">
+    Add a `Helicone-User-Id` header to tag requests with user IDs:
+    
+    ```typescript
+    const response = await client.chat.completions.create(
+      {
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: "Hello!" }],
+      },
+      {
+        headers: {
+          "Helicone-User-Id": "user-123",
+        },
+      }
+    );
+    ```
+    
+    Then filter by user in the dashboard to see per-user costs and usage.
+  </Accordion>
+  
+  <Accordion title="How do I debug AI agent workflows?">
+    Use sessions to group related requests and trace multi-step workflows:
+    
+    ```typescript
+    const sessionId = "research-task-" + Date.now();
+    
+    // Step 1: Web search
+    await client.chat.completions.create(
+      { model: "gpt-4o-mini", messages: [...] },
+      { headers: { 
+        "Helicone-Session-Id": sessionId,
+        "Helicone-Session-Path": "/research/web_search"
+      }}
+    );
+    
+    // Step 2: Summarize
+    await client.chat.completions.create(
+      { model: "gpt-4o-mini", messages: [...] },
+      { headers: { 
+        "Helicone-Session-Id": sessionId,
+        "Helicone-Session-Path": "/research/summarize"
+      }}
+    );
+    ```
+    
+    View the complete workflow tree in the Sessions tab.
+  </Accordion>
+  
+  <Accordion title="How do I set up automatic fallbacks?">
+    Specify multiple models separated by commas - Helicone will try them in order:
+    
+    ```typescript
+    const response = await client.chat.completions.create({
+      // Try OpenAI first, fallback to Anthropic if it fails
+      model: "gpt-4o-mini,claude-sonnet-4",
+      messages: [{ role: "user", content: "Hello!" }],
+    });
+    ```
+    
+    Your app stays online even during provider outages.
+  </Accordion>
+  
+  <Accordion title="How do I cache responses to save costs?">
+    Enable caching with a header to reuse identical responses:
+    
+    ```typescript
+    const response = await client.chat.completions.create(
+      {
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: "What is 2+2?" }],
+      },
+      {
+        headers: {
+          "Helicone-Cache-Enabled": "true",
+        },
+      }
+    );
+    ```
+    
+    Identical requests are served from cache instantly at zero cost.
+  </Accordion>
+</AccordionGroup>
+
+## Need Help?
+
+We're here to help you succeed:
+
+<CardGroup cols={2}>
+  <Card title="Join Discord" icon="discord" href="https://discord.com/invite/HwUbV3Q8qz">
+    Chat with 2000+ developers in our community
+  </Card>
+  
+  <Card title="Email Support" icon="envelope">
+    Contact help@helicone.ai with questions
+  </Card>
+  
+  <Card title="Documentation" icon="book" href="/gateway/integrations/overview">
+    Explore integration guides for all frameworks
+  </Card>
+  
+  <Card title="GitHub" icon="github" href="https://github.com/helicone/helicone">
+    Star us and contribute to the project
+  </Card>
+</CardGroup>
+
+<Tip>
+**Pro tip:** Start with basic request logging, then add custom properties, sessions, and prompts as your needs grow. Each feature builds on the others to give you complete observability.
+</Tip>

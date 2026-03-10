@@ -1,0 +1,496 @@
+---
+title: "Get Request by ID"
+api: "GET https://api.helicone.ai/v1/request/{requestId}"
+description: "Retrieve a specific request by its ID"
+---
+
+Retrieve detailed information about a specific request using its unique identifier. This endpoint returns the full request and response data, including metadata, tokens, costs, and custom properties.
+
+## Path Parameters
+
+<ParamField path="requestId" type="string" required>
+  The unique identifier of the request to retrieve. This can be found in the `Helicone-Id` response header when making requests through Helicone, or in the `request_id` field when querying requests.
+  
+  Example: `req_abc123def456`
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="includeBody" type="boolean" default="false">
+  Whether to include the full request and response bodies in the result. 
+  
+  - `true` - Returns full request/response bodies (may be large)
+  - `false` - Returns metadata only, with signed URLs for accessing bodies
+  
+  <Note>
+    Setting this to `true` may significantly increase response size for requests with large payloads.
+  </Note>
+</ParamField>
+
+## Response
+
+<ResponseField name="data" type="HeliconeRequest">
+  The request object with full details.
+  
+  <Expandable title="HeliconeRequest object">
+    <ResponseField name="request_id" type="string">
+      Unique identifier for the request.
+    </ResponseField>
+    
+    <ResponseField name="request_created_at" type="string">
+      ISO 8601 timestamp of when the request was created.
+      
+      Example: `"2024-01-15T14:30:00.000Z"`
+    </ResponseField>
+    
+    <ResponseField name="request_body" type="object">
+      The request payload sent to the LLM provider. Only included when `includeBody=true`.
+    </ResponseField>
+    
+    <ResponseField name="request_path" type="string">
+      API endpoint path that was called.
+      
+      Example: `"/v1/chat/completions"`
+    </ResponseField>
+    
+    <ResponseField name="request_user_id" type="string | null">
+      User ID associated with the request (from Helicone-User-Id header).
+    </ResponseField>
+    
+    <ResponseField name="request_properties" type="object | null">
+      Custom properties attached to the request via Helicone-Property-* headers.
+      
+      Example:
+      ```json
+      {
+        "Environment": "production",
+        "Conversation": "support_123",
+        "App": "mobile"
+      }
+      ```
+    </ResponseField>
+    
+    <ResponseField name="request_model" type="string | null">
+      Model name from the request.
+      
+      Example: `"gpt-4"`
+    </ResponseField>
+    
+    <ResponseField name="response_id" type="string | null">
+      Unique identifier for the response.
+    </ResponseField>
+    
+    <ResponseField name="response_created_at" type="string | null">
+      ISO 8601 timestamp of when the response was created.
+    </ResponseField>
+    
+    <ResponseField name="response_body" type="object">
+      The response payload from the LLM provider. Only included when `includeBody=true`.
+    </ResponseField>
+    
+    <ResponseField name="response_status" type="number">
+      HTTP status code of the response.
+      
+      Example: `200`, `400`, `500`
+    </ResponseField>
+    
+    <ResponseField name="response_model" type="string | null">
+      Model name from the response (may differ from request_model).
+    </ResponseField>
+    
+    <ResponseField name="model_override" type="string | null">
+      Model override specified via Helicone-Model-Override header.
+    </ResponseField>
+    
+    <ResponseField name="helicone_user" type="string | null">
+      User identifier from Helicone-User-Id header.
+    </ResponseField>
+    
+    <ResponseField name="provider" type="string">
+      LLM provider name.
+      
+      Examples: `"OPENAI"`, `"ANTHROPIC"`, `"AZURE"`, `"GOOGLE"`, `"TOGETHER_AI"`
+    </ResponseField>
+    
+    <ResponseField name="delay_ms" type="number | null">
+      Total latency in milliseconds from request to response completion.
+    </ResponseField>
+    
+    <ResponseField name="time_to_first_token" type="number | null">
+      Time to first token in milliseconds (for streaming requests).
+    </ResponseField>
+    
+    <ResponseField name="total_tokens" type="number | null">
+      Total tokens used (prompt + completion).
+    </ResponseField>
+    
+    <ResponseField name="prompt_tokens" type="number | null">
+      Number of tokens in the prompt/input.
+    </ResponseField>
+    
+    <ResponseField name="completion_tokens" type="number | null">
+      Number of tokens in the completion/output.
+    </ResponseField>
+    
+    <ResponseField name="reasoning_tokens" type="number | null">
+      Number of reasoning tokens (for reasoning models like o1).
+    </ResponseField>
+    
+    <ResponseField name="prompt_cache_write_tokens" type="number | null">
+      Number of tokens written to prompt cache.
+    </ResponseField>
+    
+    <ResponseField name="prompt_cache_read_tokens" type="number | null">
+      Number of tokens read from prompt cache.
+    </ResponseField>
+    
+    <ResponseField name="prompt_audio_tokens" type="number | null">
+      Number of audio tokens in the prompt (for multimodal models).
+    </ResponseField>
+    
+    <ResponseField name="completion_audio_tokens" type="number | null">
+      Number of audio tokens in the completion (for multimodal models).
+    </ResponseField>
+    
+    <ResponseField name="cost" type="number | null">
+      Cost of the request in USD.
+    </ResponseField>
+    
+    <ResponseField name="costUSD" type="number | null">
+      Alternative field for cost in USD.
+    </ResponseField>
+    
+    <ResponseField name="prompt_id" type="string | null">
+      Prompt ID from Helicone-Prompt-Id header.
+    </ResponseField>
+    
+    <ResponseField name="prompt_version" type="string | null">
+      Prompt version identifier.
+    </ResponseField>
+    
+    <ResponseField name="feedback_created_at" type="string | null">
+      Timestamp when feedback was added to this request.
+    </ResponseField>
+    
+    <ResponseField name="feedback_id" type="string | null">
+      Unique identifier for the feedback.
+    </ResponseField>
+    
+    <ResponseField name="feedback_rating" type="boolean | null">
+      Feedback rating (true for positive, false for negative).
+    </ResponseField>
+    
+    <ResponseField name="signed_body_url" type="string | null">
+      Presigned URL to download the full request/response body (when `includeBody=false`).
+    </ResponseField>
+    
+    <ResponseField name="llmSchema" type="object | null">
+      Normalized LLM schema containing structured request and response data.
+    </ResponseField>
+    
+    <ResponseField name="country_code" type="string | null">
+      Country code of the request origin.
+    </ResponseField>
+    
+    <ResponseField name="asset_ids" type="string[] | null">
+      Array of asset IDs associated with this request.
+    </ResponseField>
+    
+    <ResponseField name="asset_urls" type="object | null">
+      Map of asset IDs to their URLs.
+    </ResponseField>
+    
+    <ResponseField name="scores" type="object | null">
+      Evaluation scores attached to this request.
+      
+      Example:
+      ```json
+      {
+        "accuracy": 95,
+        "relevance": 87,
+        "helpfulness": 92
+      }
+      ```
+    </ResponseField>
+    
+    <ResponseField name="properties" type="object">
+      Custom properties attached to the request.
+    </ResponseField>
+    
+    <ResponseField name="assets" type="string[]">
+      Array of asset identifiers.
+    </ResponseField>
+    
+    <ResponseField name="target_url" type="string">
+      The target URL that was proxied to.
+    </ResponseField>
+    
+    <ResponseField name="model" type="string">
+      The model used for this request.
+    </ResponseField>
+    
+    <ResponseField name="cache_reference_id" type="string | null">
+      Cache reference ID if this request was cached.
+    </ResponseField>
+    
+    <ResponseField name="cache_enabled" type="boolean">
+      Whether caching was enabled for this request.
+    </ResponseField>
+    
+    <ResponseField name="updated_at" type="string">
+      ISO 8601 timestamp of when the request was last updated.
+    </ResponseField>
+    
+    <ResponseField name="request_referrer" type="string | null">
+      Referrer information from the request.
+    </ResponseField>
+    
+    <ResponseField name="storage_location" type="string">
+      Storage location identifier for the request data.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="error" type="string | null">
+  Error message if the request failed.
+</ResponseField>
+
+## Examples
+
+### Get Request Metadata Only
+
+Retrieve request metadata without the full body:
+
+```bash cURL
+curl --request GET \
+  --url https://api.helicone.ai/v1/request/req_abc123def456 \
+  --header 'Authorization: Bearer <HELICONE_API_KEY>'
+```
+
+```typescript TypeScript
+const requestId = 'req_abc123def456';
+
+const response = await fetch(
+  `https://api.helicone.ai/v1/request/${requestId}`,
+  {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`
+    }
+  }
+);
+
+const result = await response.json();
+console.log(result.data);
+```
+
+```python Python
+import os
+import requests
+
+request_id = "req_abc123def456"
+
+response = requests.get(
+    f"https://api.helicone.ai/v1/request/{request_id}",
+    headers={
+        "Authorization": f"Bearer {os.environ['HELICONE_API_KEY']}"
+    }
+)
+
+result = response.json()
+print(result["data"])
+```
+
+### Get Request with Full Body
+
+Retrieve request with full request and response bodies:
+
+```bash cURL
+curl --request GET \
+  --url 'https://api.helicone.ai/v1/request/req_abc123def456?includeBody=true' \
+  --header 'Authorization: Bearer <HELICONE_API_KEY>'
+```
+
+```typescript TypeScript
+const requestId = 'req_abc123def456';
+
+const response = await fetch(
+  `https://api.helicone.ai/v1/request/${requestId}?includeBody=true`,
+  {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`
+    }
+  }
+);
+
+const result = await response.json();
+console.log(result.data.request_body);
+console.log(result.data.response_body);
+```
+
+```python Python
+import os
+import requests
+
+request_id = "req_abc123def456"
+
+response = requests.get(
+    f"https://api.helicone.ai/v1/request/{request_id}",
+    params={"includeBody": True},
+    headers={
+        "Authorization": f"Bearer {os.environ['HELICONE_API_KEY']}"
+    }
+)
+
+result = response.json()
+print(result["data"]["request_body"])
+print(result["data"]["response_body"])
+```
+
+### Extract Request ID from Response Headers
+
+When making a request through Helicone, you can extract the request ID from the response headers:
+
+```typescript TypeScript
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'https://gateway.helicone.ai/v1',
+  defaultHeaders: {
+    'Helicone-Auth': `Bearer ${process.env.HELICONE_API_KEY}`
+  }
+});
+
+// Make a request and get the response with headers
+const { data, response } = await client.chat.completions
+  .create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: 'Hello!' }]
+  })
+  .withResponse();
+
+// Extract the request ID
+const requestId = response.headers.get('helicone-id');
+console.log('Request ID:', requestId);
+
+// Now you can retrieve this request later
+const requestDetails = await fetch(
+  `https://api.helicone.ai/v1/request/${requestId}`,
+  {
+    headers: {
+      'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`
+    }
+  }
+);
+```
+
+```python Python
+from openai import OpenAI
+import os
+
+client = OpenAI(
+    base_url="https://gateway.helicone.ai/v1",
+    default_headers={
+        "Helicone-Auth": f"Bearer {os.environ['HELICONE_API_KEY']}"
+    }
+)
+
+# Make a request
+response = client.with_raw_response.chat.completions.create(
+    model="gpt-4",
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+
+# Extract the request ID
+request_id = response.headers.get("helicone-id")
+print(f"Request ID: {request_id}")
+
+# Now you can retrieve this request later
+import requests
+
+request_details = requests.get(
+    f"https://api.helicone.ai/v1/request/{request_id}",
+    headers={
+        "Authorization": f"Bearer {os.environ['HELICONE_API_KEY']}"
+    }
+)
+```
+
+## Use Cases
+
+### Debugging Failed Requests
+
+Retrieve full details of a failed request to debug issues:
+
+```typescript
+const debugRequest = async (requestId: string) => {
+  const response = await fetch(
+    `https://api.helicone.ai/v1/request/${requestId}?includeBody=true`,
+    {
+      headers: {
+        'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`
+      }
+    }
+  );
+  
+  const result = await response.json();
+  const request = result.data;
+  
+  if (request.response_status >= 400) {
+    console.log('Failed request details:');
+    console.log('Status:', request.response_status);
+    console.log('Model:', request.model);
+    console.log('Error:', request.response_body?.error);
+    console.log('Request body:', request.request_body);
+  }
+};
+```
+
+### Cost Analysis
+
+Analyze costs and tokens for specific requests:
+
+```typescript
+const analyzeRequest = async (requestId: string) => {
+  const response = await fetch(
+    `https://api.helicone.ai/v1/request/${requestId}`,
+    {
+      headers: {
+        'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`
+      }
+    }
+  );
+  
+  const result = await response.json();
+  const request = result.data;
+  
+  console.log('Cost Analysis:');
+  console.log('Model:', request.model);
+  console.log('Total cost:', `$${request.cost}`);
+  console.log('Prompt tokens:', request.prompt_tokens);
+  console.log('Completion tokens:', request.completion_tokens);
+  console.log('Total tokens:', request.total_tokens);
+  console.log('Latency:', `${request.delay_ms}ms`);
+};
+```
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Query Requests" icon="magnifying-glass" href="/api/requests/query">
+    Query multiple requests with filters
+  </Card>
+  
+  <Card title="Add Feedback" icon="thumbs-up" href="/api/requests/feedback">
+    Add feedback to this request
+  </Card>
+  
+  <Card title="Add Properties" icon="tag" href="/api/requests/properties">
+    Add custom properties to this request
+  </Card>
+  
+  <Card title="Add Scores" icon="star" href="/api/requests/scores">
+    Add evaluation scores to this request
+  </Card>
+</CardGroup>

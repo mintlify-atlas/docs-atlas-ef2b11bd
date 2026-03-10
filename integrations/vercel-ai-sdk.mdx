@@ -1,0 +1,543 @@
+---
+title: 'Vercel AI SDK Integration'
+description: 'Integrate Helicone with Vercel AI SDK for monitoring and observability'
+icon: 'react'
+---
+
+Helicone integrates seamlessly with the Vercel AI SDK, providing observability for streaming AI applications built with Next.js and React.
+
+## Integration Methods
+
+<CardGroup cols={2}>
+  <Card title="Provider Configuration" icon="gear">
+    Configure AI SDK providers to route through Helicone.
+  </Card>
+  <Card title="AI Gateway" icon="network-wired" href="/gateway/overview">
+    Use the AI Gateway for unified access to all providers.
+  </Card>
+  <Card title="Custom Headers" icon="code">
+    Add Helicone headers to track sessions and custom properties.
+  </Card>
+  <Card title="Async Logging" icon="bolt" href="/integrations/async-logging">
+    Zero-latency logging for production apps.
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+<Steps>
+  <Step title="Install dependencies">
+    ```bash
+    npm install ai @ai-sdk/openai @ai-sdk/anthropic
+    ```
+  </Step>
+  
+  <Step title="Configure provider with Helicone">
+    <Tabs>
+      <Tab title="OpenAI Provider">
+        ```typescript
+        import { createOpenAI } from "@ai-sdk/openai";
+
+        const openai = createOpenAI({
+          baseURL: "https://oai.helicone.ai/v1",
+          apiKey: process.env.OPENAI_API_KEY,
+          headers: {
+            "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+          },
+        });
+        ```
+      </Tab>
+      
+      <Tab title="Anthropic Provider">
+        ```typescript
+        import { createAnthropic } from "@ai-sdk/anthropic";
+
+        const anthropic = createAnthropic({
+          baseURL: "https://anthropic.helicone.ai",
+          apiKey: process.env.ANTHROPIC_API_KEY,
+          headers: {
+            "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+          },
+        });
+        ```
+      </Tab>
+      
+      <Tab title="AI Gateway">
+        ```typescript
+        import { createOpenAI } from "@ai-sdk/openai";
+
+        const gateway = createOpenAI({
+          baseURL: "https://ai-gateway.helicone.ai",
+          apiKey: process.env.HELICONE_API_KEY,
+        });
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+  
+  <Step title="Use with AI SDK functions">
+    ```typescript
+    import { generateText } from "ai";
+
+    const { text } = await generateText({
+      model: openai("gpt-4o-mini"),
+      prompt: "What is the capital of France?",
+    });
+
+    console.log(text);
+    ```
+  </Step>
+</Steps>
+
+## Streaming Chat
+
+Integrate Helicone with Next.js API routes:
+
+```typescript
+// app/api/chat/route.ts
+import { createOpenAI } from "@ai-sdk/openai";
+import { streamText } from "ai";
+
+const openai = createOpenAI({
+  baseURL: "https://oai.helicone.ai/v1",
+  apiKey: process.env.OPENAI_API_KEY!,
+  headers: {
+    "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+  },
+});
+
+export async function POST(req: Request) {
+  const { messages } = await req.json();
+
+  const result = await streamText({
+    model: openai("gpt-4o-mini"),
+    messages,
+  });
+
+  return result.toDataStreamResponse();
+}
+```
+
+Client-side:
+
+```typescript
+// app/page.tsx
+"use client";
+
+import { useChat } from "ai/react";
+
+export default function Chat() {
+  const { messages, input, handleInputChange, handleSubmit } = useChat();
+
+  return (
+    <div>
+      {messages.map((m) => (
+        <div key={m.id}>
+          {m.role}: {m.content}
+        </div>
+      ))}
+
+      <form onSubmit={handleSubmit}>
+        <input value={input} onChange={handleInputChange} />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  );
+}
+```
+
+## Session Tracking
+
+Track multi-turn conversations with session IDs:
+
+```typescript
+import { createOpenAI } from "@ai-sdk/openai";
+import { generateText } from "ai";
+import { v4 as uuidv4 } from "uuid";
+
+const sessionId = uuidv4();
+
+const openai = createOpenAI({
+  baseURL: "https://oai.helicone.ai/v1",
+  apiKey: process.env.OPENAI_API_KEY!,
+  headers: {
+    "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+  },
+});
+
+const { text } = await generateText({
+  model: openai("gpt-4o-mini"),
+  prompt: "Hello!",
+  headers: {
+    "Helicone-Session-Id": sessionId,
+    "Helicone-Session-Name": "Customer Chat",
+    "Helicone-User-Id": "user-123",
+  },
+});
+```
+
+In API routes:
+
+```typescript
+// app/api/chat/route.ts
+import { createOpenAI } from "@ai-sdk/openai";
+import { streamText } from "ai";
+
+const openai = createOpenAI({
+  baseURL: "https://oai.helicone.ai/v1",
+  apiKey: process.env.OPENAI_API_KEY!,
+  headers: {
+    "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+  },
+});
+
+export async function POST(req: Request) {
+  const { messages, sessionId, userId } = await req.json();
+
+  const result = await streamText({
+    model: openai("gpt-4o-mini"),
+    messages,
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-User-Id": userId,
+      "Helicone-Property-Path": req.url,
+    },
+  });
+
+  return result.toDataStreamResponse();
+}
+```
+
+Learn more about [Session Tracking](/observability/sessions).
+
+## Custom Properties
+
+Add custom metadata to track important context:
+
+```typescript
+import { generateText } from "ai";
+
+const { text } = await generateText({
+  model: openai("gpt-4o-mini"),
+  prompt: "Analyze this user query",
+  headers: {
+    "Helicone-User-Id": "user-123",
+    "Helicone-Property-Environment": "production",
+    "Helicone-Property-Feature": "query-analysis",
+    "Helicone-Property-Version": "v2.1.0",
+  },
+});
+```
+
+## Tool Calling
+
+Helicone tracks tool calls with full visibility:
+
+```typescript
+import { generateText, tool } from "ai";
+import { z } from "zod";
+
+const { text, toolCalls } = await generateText({
+  model: openai("gpt-4o-mini"),
+  prompt: "What's the weather in Paris?",
+  tools: {
+    weather: tool({
+      description: "Get the weather for a location",
+      parameters: z.object({
+        location: z.string().describe("The city name"),
+      }),
+      execute: async ({ location }) => {
+        // Fetch weather data
+        return { temperature: 20, condition: "sunny" };
+      },
+    }),
+  },
+  headers: {
+    "Helicone-Property-Tools": "weather",
+  },
+});
+
+// Tool calls are logged with inputs and outputs
+console.log(toolCalls);
+```
+
+## AWS Bedrock
+
+Use Vercel AI SDK with AWS Bedrock through Helicone:
+
+```typescript
+import { createAmazonBedrock } from "@ai-sdk/amazon-bedrock";
+import { generateText } from "ai";
+
+const bedrock = createAmazonBedrock({
+  region: process.env.AWS_REGION!,
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  baseURL: `https://bedrock.helicone.ai/v1/${process.env.AWS_REGION}`,
+  headers: {
+    "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+    "aws-access-key": process.env.AWS_ACCESS_KEY_ID!,
+    "aws-secret-key": process.env.AWS_SECRET_ACCESS_KEY!,
+    "Accept-Encoding": "identity",
+  },
+});
+
+const { text } = await generateText({
+  model: bedrock("anthropic.claude-3-5-sonnet-20240620-v1:0"),
+  prompt: "Hello!",
+  headers: {
+    "Helicone-Session-Id": "bedrock-session-123",
+  },
+});
+```
+
+## Response Caching
+
+Reduce costs with response caching:
+
+```typescript
+import { generateText } from "ai";
+
+const { text } = await generateText({
+  model: openai("gpt-4o-mini"),
+  prompt: "What is 2+2?",
+  headers: {
+    "Helicone-Cache-Enabled": "true",
+  },
+});
+
+// Subsequent identical requests return cached responses
+```
+
+Learn more about [Response Caching](/features/caching).
+
+## Object Generation
+
+Track structured object generation:
+
+```typescript
+import { generateObject } from "ai";
+import { z } from "zod";
+
+const { object } = await generateObject({
+  model: openai("gpt-4o-mini"),
+  schema: z.object({
+    name: z.string(),
+    age: z.number(),
+    city: z.string(),
+  }),
+  prompt: "Generate a person's profile",
+  headers: {
+    "Helicone-Property-Type": "structured-generation",
+  },
+});
+
+console.log(object);
+```
+
+## Streaming Objects
+
+Stream structured data generation:
+
+```typescript
+import { streamObject } from "ai";
+import { z } from "zod";
+
+const { partialObjectStream } = await streamObject({
+  model: openai("gpt-4o-mini"),
+  schema: z.object({
+    recipe: z.object({
+      name: z.string(),
+      ingredients: z.array(z.string()),
+      steps: z.array(z.string()),
+    }),
+  }),
+  prompt: "Generate a recipe for chocolate cake",
+});
+
+for await (const partialObject of partialObjectStream) {
+  console.log(partialObject);
+}
+```
+
+## Multi-Modal (Vision)
+
+Use vision models with Helicone:
+
+```typescript
+import { generateText } from "ai";
+
+const { text } = await generateText({
+  model: openai("gpt-4o"),
+  messages: [
+    {
+      role: "user",
+      content: [
+        { type: "text", text: "What's in this image?" },
+        {
+          type: "image",
+          image: "https://example.com/image.jpg",
+        },
+      ],
+    },
+  ],
+  headers: {
+    "Helicone-Property-Type": "vision",
+  },
+});
+```
+
+## Rate Limiting
+
+Control usage per user:
+
+```typescript
+import { generateText } from "ai";
+
+const { text } = await generateText({
+  model: openai("gpt-4o-mini"),
+  prompt: "Hello!",
+  headers: {
+    "Helicone-RateLimit-Policy": "100;w=60;s=user",
+    "Helicone-User-Id": "user-123",
+  },
+});
+```
+
+Learn more about [Rate Limiting](/features/rate-limiting).
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always include session IDs">
+    Track conversations with session IDs:
+    
+    ```typescript
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-User-Id": userId,
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Use custom properties for filtering">
+    Add context for better organization:
+    
+    ```typescript
+    headers: {
+      "Helicone-Property-Environment": "production",
+      "Helicone-Property-Feature": "chat",
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Track tool usage">
+    Label requests that use tools:
+    
+    ```typescript
+    headers: {
+      "Helicone-Property-Tools": "weather,search",
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Enable caching for repeated queries">
+    Reduce costs with caching:
+    
+    ```typescript
+    headers: {
+      "Helicone-Cache-Enabled": "true",
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Server Actions
+
+Use Helicone with Next.js Server Actions:
+
+```typescript
+// app/actions.ts
+"use server";
+
+import { createOpenAI } from "@ai-sdk/openai";
+import { generateText } from "ai";
+
+const openai = createOpenAI({
+  baseURL: "https://oai.helicone.ai/v1",
+  apiKey: process.env.OPENAI_API_KEY!,
+  headers: {
+    "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+  },
+});
+
+export async function generateResponse(prompt: string, userId: string) {
+  const { text } = await generateText({
+    model: openai("gpt-4o-mini"),
+    prompt,
+    headers: {
+      "Helicone-User-Id": userId,
+      "Helicone-Property-Source": "server-action",
+    },
+  });
+
+  return text;
+}
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Requests not appearing in dashboard">
+    1. Verify your Helicone API key is correct
+    2. Check the `Helicone-Auth` header format: `Bearer sk-helicone-...`
+    3. Ensure you're passing headers to the provider config, not the individual function
+    4. Check browser network tab for failed requests
+  </Accordion>
+  
+  <Accordion title="Streaming not working">
+    - Ensure your Next.js API route returns `result.toDataStreamResponse()`
+    - Check that streaming is enabled in your deployment platform
+    - Verify no middleware is buffering the response
+  </Accordion>
+  
+  <Accordion title="Session tracking not working">
+    - Session IDs must be consistent across requests
+    - Pass session ID from client to API route
+    - Use UUIDs or unique strings for session IDs
+  </Accordion>
+  
+  <Accordion title="Headers not being sent">
+    Headers should be in the provider configuration:
+    
+    ```typescript
+    // Correct
+    const openai = createOpenAI({
+      headers: { "Helicone-Auth": "..." }
+    });
+
+    // Also supported (per-request)
+    await generateText({
+      model: openai("gpt-4o-mini"),
+      headers: { "Helicone-Session-Id": "..." }
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="AI Gateway" icon="network-wired" href="/gateway/overview">
+    Use multiple providers with automatic fallbacks
+  </Card>
+  <Card title="Session Tracking" icon="diagram-project" href="/observability/sessions">
+    Track multi-turn conversations
+  </Card>
+  <Card title="Custom Properties" icon="tag" href="/features/custom-properties">
+    Add custom metadata
+  </Card>
+  <Card title="Response Caching" icon="database" href="/features/caching">
+    Reduce costs with caching
+  </Card>
+</CardGroup>

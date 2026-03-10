@@ -1,0 +1,498 @@
+---
+title: "Architecture"
+description: "Understanding Helicone's architecture and how services work together"
+icon: "sitemap"
+---
+
+## System Overview
+
+Helicone is built as a modular, scalable system with six core components:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                      User / Browser                      │
+└────────────┬────────────────────────────────────────────┘
+             │
+             │ HTTPS
+             │
+┌────────────▼─────────────────────────────────────────────┐
+│                    Web (Next.js)                          │
+│  • Dashboard UI                                           │
+│  • Request visualization                                  │
+│  • Analytics and reports                                  │
+└────────────┬──────────────────────────────┬──────────────┘
+             │                              │
+             │ API Calls                    │ Auth
+             │                              │
+┌────────────▼──────────────────────────────▼──────────────┐
+│                    Jawn (Express + Tsoa)                  │
+│  • REST API server                                        │
+│  • Request logging                                        │
+│  • Prompt management                                      │
+│  • User/org management                                    │
+└─┬────────┬────────┬────────┬────────┬────────────────────┘
+  │        │        │        │        │
+  │        │        │        │        └─────────┐
+  │        │        │        │                  │
+┌─▼────┐ ┌▼────────▼┐ ┌─────▼──────┐ ┌────────▼──────┐
+│Worker│ │PostgreSQL│ │ ClickHouse │ │     MinIO     │
+│      │ │          │ │            │ │  (S3 Storage) │
+│Proxy │ │ App DB   │ │Analytics DB│ │               │
+│      │ │          │ │            │ │               │
+└──┬───┘ └──────────┘ └────────────┘ └───────────────┘
+   │
+   │ Proxied requests
+   │
+┌──▼──────────────────────────────────────────────────────┐
+│              LLM Providers (OpenAI, etc.)               │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Core Components
+
+### Web (Next.js)
+
+**Technology:** Next.js 14, React, TailwindCSS
+
+**Purpose:** Frontend dashboard for visualizing and managing your LLM observability data.
+
+**Key Features:**
+- Request logs and trace visualization
+- Cost and latency analytics
+- Prompt management UI
+- Session and agent tracing
+- User and organization management
+- Evaluation and scoring interfaces
+
+**Configuration:**
+```bash
+# Environment variables
+NEXT_PUBLIC_HELICONE_JAWN_SERVICE=http://localhost:8585
+BETTER_AUTH_SECRET=your-secret-key
+DATABASE_URL=postgresql://...
+```
+
+**Default Port:** 3000
+
+### Jawn (Backend API)
+
+**Technology:** Node.js, Express, TypeScript, Tsoa (OpenAPI)
+
+**Purpose:** Main backend API server that handles all business logic and data operations.
+
+**Responsibilities:**
+- REST API endpoints for the web dashboard
+- Request and response logging
+- Prompt versioning and deployment
+- User authentication and authorization
+- Analytics aggregation
+- Webhook management
+- Dataset creation and management
+
+**Configuration:**
+```bash
+# Core settings
+PORT=8585
+NODE_ENV=production
+
+# Databases
+SUPABASE_DATABASE_URL=postgresql://...
+CLICKHOUSE_HOST=http://clickhouse:8123
+
+# Object storage
+S3_ENDPOINT=http://minio:9000
+S3_BUCKET_NAME=request-response-storage
+S3_ACCESS_KEY=minioadmin
+S3_SECRET_KEY=minioadmin
+
+# Auth
+BETTER_AUTH_SECRET=your-secret-key
+```
+
+**Default Port:** 8585
+
+**Key Endpoints:**
+- `/v1/request/*` - Request logging and retrieval
+- `/v1/prompt/*` - Prompt management
+- `/v1/user/*` - User and organization management
+- `/v1/analytics/*` - Analytics queries
+
+### Worker (Cloudflare Workers / Node.js)
+
+**Technology:** TypeScript, running on Node.js (self-hosted) or Cloudflare Workers (cloud)
+
+**Purpose:** High-performance proxy that intercepts LLM requests, logs them, and forwards to providers.
+
+**Worker Types:**
+
+1. **OpenAI Proxy** (Port 8787)
+   - Proxies requests to OpenAI API
+   - Logs requests to ClickHouse
+   - Stores bodies in MinIO
+
+2. **Anthropic Proxy** (Port 8790)
+   - Proxies requests to Anthropic API
+   - Handles streaming responses
+
+3. **Gateway API** (Port 8789)
+   - Unified gateway for multiple providers
+   - Intelligent routing and fallbacks
+
+4. **Helicone API** (Port 8788)
+   - Internal API worker
+   - Async logging endpoints
+
+**Configuration:**
+```bash
+WORKER_TYPE=OPENAI_PROXY
+WORKER_PORT=8787
+CLICKHOUSE_HOST=http://clickhouse:8123
+VALHALLA_URL=http://jawn:8585
+S3_ENDPOINT=http://minio:9000
+```
+
+### PostgreSQL (Application Database)
+
+**Technology:** PostgreSQL 17
+
+**Purpose:** Stores application data including users, organizations, API keys, prompts, and metadata.
+
+**Key Tables:**
+- `auth.users` - User accounts
+- `public.organization` - Organizations
+- `public.helicone_api_keys` - API keys
+- `public.prompts` - Prompt versions
+- `public.request` - Request metadata (references ClickHouse)
+- `public.properties` - Custom properties
+- `public.feedback` - User feedback and ratings
+
+**Configuration:**
+```bash
+POSTGRES_HOST=db
+POSTGRES_PORT=5432
+POSTGRES_DB=helicone_test
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=password
+```
+
+**Default Port:** 5432 (mapped to 54388 in docker-compose)
+
+### ClickHouse (Analytics Database)
+
+**Technology:** ClickHouse 24.3
+
+**Purpose:** High-performance columnar database for storing and analyzing request logs at scale.
+
+**Key Tables:**
+- `default.request_response_versioned` - Main request/response log
+- `default.request_response_rmt` - Replicated table for HA
+- `default.properties_v2` - Request properties
+- `default.score_value` - Evaluation scores
+- `default.cache_hits` - Cache performance data
+
+**Why ClickHouse?**
+- Handles billions of rows efficiently
+- Fast aggregations for analytics
+- Excellent compression (10x+ vs PostgreSQL)
+- Optimized for time-series data
+
+**Configuration:**
+```bash
+CLICKHOUSE_HOST=http://clickhouse:8123
+CLICKHOUSE_USER=default
+CLICKHOUSE_PASSWORD=
+```
+
+**Default Ports:**
+- HTTP: 8123 (mapped to 18123)
+- Native: 9000 (mapped to 19000)
+
+### MinIO (Object Storage)
+
+**Technology:** MinIO (S3-compatible)
+
+**Purpose:** Stores large request and response bodies separately from metadata.
+
+**Buckets:**
+- `request-response-storage` - Full request/response bodies
+- `prompt-body-storage` - Prompt templates and versions
+- `hql-store` - HQL query results
+
+**Why Separate Storage?**
+- Request/response bodies can be very large (images, documents, etc.)
+- Storing in database would bloat tables and slow queries
+- S3-compatible storage is cheap and scalable
+- Bodies are referenced by ID in ClickHouse
+
+**Configuration:**
+```bash
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=minioadmin
+S3_ENDPOINT=http://minio:9000
+S3_BUCKET_NAME=request-response-storage
+```
+
+**Default Ports:**
+- API: 9000
+- Console: 9001
+
+## Request Flow
+
+### 1. Proxied Request Flow
+
+When an LLM request goes through Helicone's proxy:
+
+```
+┌──────────┐
+│  Client  │
+└────┬─────┘
+     │ 1. Request with Helicone headers
+     │    POST http://localhost:8787/v1/chat/completions
+     │    Headers: Helicone-Auth, Helicone-Property-*, etc.
+     │
+┌────▼────────────────────────────────────────────────┐
+│  Worker (OpenAI Proxy)                              │
+│  1. Validate API key (check PostgreSQL via Jawn)    │
+│  2. Extract metadata and properties                 │
+│  3. Forward to OpenAI                               │
+└────┬─────────────────┬────────────────────────────┬─┘
+     │                 │                            │
+     │ 4. Log request  │ 5. Store body             │ 3. Forward
+     │                 │                            │
+┌────▼──────────┐ ┌────▼──────┐            ┌───────▼──────┐
+│  ClickHouse   │ │   MinIO   │            │   OpenAI     │
+│  (metadata)   │ │  (bodies) │            │     API      │
+└───────────────┘ └───────────┘            └───────┬──────┘
+                                                    │
+                                                    │ 6. Response
+┌───────────────────────────────────────────────────▼──┐
+│  Worker                                              │
+│  7. Log response metadata to ClickHouse              │
+│  8. Store response body to MinIO                     │
+│  9. Return response to client                        │
+└──────────────────────────────────────────────────────┘
+```
+
+### 2. Dashboard Query Flow
+
+When viewing requests in the dashboard:
+
+```
+┌──────────┐
+│ Browser  │
+└────┬─────┘
+     │ 1. GET /requests?page=1
+     │
+┌────▼─────────────────────────────────────┐
+│  Web (Next.js)                            │
+│  2. Server-side render or API call        │
+└────┬──────────────────────────────────────┘
+     │ 3. GET /v1/request/query
+     │
+┌────▼──────────────────────────────────────┐
+│  Jawn API                                  │
+│  4. Build ClickHouse query                 │
+│  5. Execute query                          │
+└────┬───────────────────┬───────────────────┘
+     │                   │
+     │ 6. Query metadata │ 7. Fetch bodies (if needed)
+     │                   │
+┌────▼──────────┐   ┌────▼──────┐
+│  ClickHouse   │   │   MinIO   │
+│               │   │           │
+└────┬──────────┘   └────┬──────┘
+     │                   │
+     │ 8. Return data    │
+     │                   │
+┌────▼───────────────────▼───────────┐
+│  Jawn API                           │
+│  9. Combine metadata + bodies       │
+│  10. Return JSON response           │
+└────┬────────────────────────────────┘
+     │
+┌────▼─────────────────────────────────┐
+│  Web                                  │
+│  11. Render in UI                     │
+└───────────────────────────────────────┘
+```
+
+## Data Storage Strategy
+
+### What Goes Where?
+
+| Data Type | Storage | Reason |
+|-----------|---------|--------|
+| User accounts | PostgreSQL | Relational, requires ACID |
+| API keys | PostgreSQL | Needs auth lookups |
+| Prompt versions | PostgreSQL | Small, relational |
+| Request metadata | ClickHouse | Fast analytics, billions of rows |
+| Request/response bodies | MinIO | Large blobs, cheap storage |
+| Properties | ClickHouse | Time-series, analytics |
+| Scores/evaluations | ClickHouse | Time-series, analytics |
+
+### Data Retention
+
+```
+┌─────────────────────────────────────────────────────┐
+│ PostgreSQL (Keep Forever)                           │
+│ • User accounts                                     │
+│ • Organizations                                     │
+│ • API keys                                          │
+│ • Prompt templates                                  │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│ ClickHouse (Configurable Retention)                 │
+│ • Request logs: 90 days default                     │
+│ • Can configure TTL per table                       │
+│ • Aggregations stored longer                        │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│ MinIO (Lifecycle Policies)                          │
+│ • Request bodies: 90 days default                   │
+│ • Transition to cold storage after 30 days          │
+│ • Configurable per bucket                           │
+└─────────────────────────────────────────────────────┘
+```
+
+## High Availability Architecture
+
+For production deployments:
+
+```
+┌─────────────────────────────────────────────────────┐
+│              Load Balancer / Ingress                 │
+└─────┬────────────────────────────────────────┬──────┘
+      │                                        │
+┌─────▼─────┐                           ┌─────▼─────┐
+│  Web (1)  │                           │  Jawn (1) │
+│  Web (2)  │◄──────────────────────────┤  Jawn (2) │
+│  Web (3)  │    Session Sharing         │  Jawn (3) │
+└───────────┘                           └─────┬─────┘
+                                              │
+                                              │
+               ┌──────────────────────────────┼────────────┐
+               │                              │            │
+        ┌──────▼────────┐            ┌────────▼─────┐ ┌───▼────┐
+        │  PostgreSQL   │            │  ClickHouse  │ │ MinIO  │
+        │               │            │              │ │        │
+        │ Primary + 2   │            │ 3-node       │ │4-node  │
+        │ Read Replicas │            │ cluster      │ │cluster │
+        └───────────────┘            └──────────────┘ └────────┘
+```
+
+## Security Architecture
+
+### Authentication Flow
+
+1. **User Authentication** (Better Auth)
+   - Email/password via PostgreSQL
+   - Session tokens stored in cookies
+   - OAuth providers (Google, GitHub)
+
+2. **API Key Authentication**
+   - API keys stored in PostgreSQL
+   - Validated on each proxy request
+   - Scoped to organizations
+
+3. **Service-to-Service**
+   - Internal services trust each other
+   - Network isolation in production
+   - Service accounts for workers
+
+### Data Security
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Encryption at Rest                                  │
+│  • PostgreSQL: Encrypted volumes                     │
+│  • ClickHouse: Encrypted volumes                     │
+│  • MinIO: SSE (Server-Side Encryption)               │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│  Encryption in Transit                               │
+│  • TLS 1.3 for all external traffic                  │
+│  • Internal: Can use mTLS in production              │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│  Access Control                                      │
+│  • Row-level security in PostgreSQL                  │
+│  • Organization-scoped queries                       │
+│  • API key permissions                               │
+└─────────────────────────────────────────────────────┘
+```
+
+## Scalability
+
+### Horizontal Scaling
+
+**Stateless Services** (can scale infinitely):
+- Web: Add more replicas behind load balancer
+- Jawn: Add more replicas behind load balancer
+- Workers: Add more worker instances
+
+**Stateful Services** (require clustering):
+- PostgreSQL: Primary + read replicas
+- ClickHouse: Sharded cluster with replication
+- MinIO: Distributed mode with erasure coding
+
+### Vertical Scaling
+
+Recommended resource allocation:
+
+| Service | CPU | Memory | Storage |
+|---------|-----|--------|----------|
+| Web | 0.5-1 core | 1-2GB | Minimal |
+| Jawn | 1-2 cores | 2-4GB | Minimal |
+| Worker | 0.5-1 core | 512MB-1GB | Minimal |
+| PostgreSQL | 2-4 cores | 4-8GB | 100GB+ |
+| ClickHouse | 4-8 cores | 8-16GB | 500GB+ |
+| MinIO | 1-2 cores | 2-4GB | 1TB+ |
+
+## Monitoring
+
+### Health Checks
+
+All services expose health endpoints:
+
+```bash
+# Web
+curl http://localhost:3000/api/health
+
+# Jawn
+curl http://localhost:8585/v1/public/healthcheck
+
+# ClickHouse
+curl http://localhost:8123/ping
+
+# PostgreSQL
+pg_isready -h localhost -p 5432
+
+# MinIO
+curl http://localhost:9000/minio/health/live
+```
+
+### Metrics
+
+Exposed Prometheus metrics:
+
+- HTTP request latency (p50, p95, p99)
+- Request volume per endpoint
+- Error rates
+- Database connection pool stats
+- Queue depths
+- Cache hit rates
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Docker Deployment" icon="docker" href="/self-hosting/docker">
+    Deploy with Docker Compose
+  </Card>
+  <Card title="Kubernetes" icon="dharmachakra" href="/self-hosting/kubernetes">
+    Production deployment with Helm
+  </Card>
+</CardGroup>

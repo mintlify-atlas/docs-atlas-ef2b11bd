@@ -1,0 +1,550 @@
+---
+title: 'Anthropic Integration'
+description: 'Integrate Helicone with Anthropic Claude for monitoring and observability'
+icon: 'message'
+---
+
+Helicone provides seamless integration with Anthropic Claude models, supporting all features including streaming, prompt caching, and tool use.
+
+## Integration Methods
+
+<CardGroup cols={2}>
+  <Card title="Proxy Integration" icon="shuffle">
+    Route requests through Helicone's Anthropic proxy.
+  </Card>
+  <Card title="AI Gateway" icon="network-wired" href="/gateway/overview">
+    Use Claude through the unified AI Gateway with OpenAI-compatible API.
+  </Card>
+  <Card title="Async Logging" icon="bolt" href="/integrations/async-logging">
+    Zero-latency logging using OpenLLMetry.
+  </Card>
+  <Card title="AWS Bedrock" icon="aws">
+    Track Claude models on AWS Bedrock.
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+<Steps>
+  <Step title="Get your API keys">
+    You'll need:
+    - Your Anthropic API key from [console.anthropic.com](https://console.anthropic.com)
+    - Your Helicone API key from [helicone.ai/developer](https://helicone.ai/developer)
+  </Step>
+  
+  <Step title="Update your base URL">
+    Change the base URL to route requests through Helicone:
+    
+    <Tabs>
+      <Tab title="TypeScript/JavaScript">
+        ```typescript
+        import Anthropic from "@anthropic-ai/sdk";
+
+        const client = new Anthropic({
+          baseURL: "https://anthropic.helicone.ai",
+          apiKey: process.env.ANTHROPIC_API_KEY,
+          defaultHeaders: {
+            "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+          },
+        });
+        ```
+      </Tab>
+      
+      <Tab title="Python">
+        ```python
+        from anthropic import Anthropic
+        import os
+
+        client = Anthropic(
+            base_url="https://anthropic.helicone.ai",
+            api_key=os.getenv("ANTHROPIC_API_KEY"),
+            default_headers={
+                "Helicone-Auth": f"Bearer {os.getenv('HELICONE_API_KEY')}"
+            }
+        )
+        ```
+      </Tab>
+      
+      <Tab title="cURL">
+        ```bash
+        curl https://anthropic.helicone.ai/v1/messages \
+          -H "Content-Type: application/json" \
+          -H "x-api-key: $ANTHROPIC_API_KEY" \
+          -H "Helicone-Auth: Bearer $HELICONE_API_KEY" \
+          -H "anthropic-version: 2023-06-01" \
+          -d '{
+            "model": "claude-3-5-sonnet-20240620",
+            "max_tokens": 1024,
+            "messages": [{"role": "user", "content": "Hello!"}]
+          }'
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+  
+  <Step title="Make requests as usual">
+    Use the Anthropic SDK normally:
+    
+    ```typescript
+    const response = await client.messages.create({
+      model: "claude-3-5-sonnet-20240620",
+      max_tokens: 1024,
+      messages: [
+        { role: "user", content: "What is the capital of France?" },
+      ],
+    });
+
+    console.log(response.content[0].text);
+    ```
+  </Step>
+  
+  <Step title="View your logs">
+    All requests are now logged to your [Helicone dashboard](https://us.helicone.ai/dashboard).
+  </Step>
+</Steps>
+
+## Streaming Support
+
+Helicone fully supports Anthropic streaming:
+
+<Tabs>
+  <Tab title="TypeScript/JavaScript">
+    ```typescript
+    const stream = await client.messages.stream({
+      model: "claude-3-5-sonnet-20240620",
+      max_tokens: 1024,
+      messages: [{ role: "user", content: "Write a poem" }],
+    });
+
+    for await (const event of stream) {
+      if (event.type === "content_block_delta") {
+        process.stdout.write(event.delta.text || "");
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    with client.messages.stream(
+        model="claude-3-5-sonnet-20240620",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": "Write a poem"}]
+    ) as stream:
+        for text in stream.text_stream:
+            print(text, end="", flush=True)
+    ```
+  </Tab>
+</Tabs>
+
+## Prompt Caching
+
+Helicone tracks Anthropic's prompt caching, showing cache hits and cost savings:
+
+```typescript
+const response = await client.messages.create(
+  {
+    model: "claude-3-5-sonnet-20240620",
+    max_tokens: 1024,
+    system: [
+      {
+        type: "text",
+        text: "You are a helpful assistant. Here is a large context...".repeat(100),
+        cache_control: { type: "ephemeral" },
+      },
+    ],
+    messages: [{ role: "user", content: "Summarize the context" }],
+  },
+  {
+    headers: {
+      "Helicone-Property-CacheTest": "enabled",
+    },
+  }
+);
+
+// Helicone dashboard shows:
+// - Cache writes
+// - Cache reads
+// - Cost savings from caching
+```
+
+## Tool Use (Function Calling)
+
+Track Claude's tool use with full visibility:
+
+```typescript
+const response = await client.messages.create({
+  model: "claude-3-5-sonnet-20240620",
+  max_tokens: 1024,
+  tools: [
+    {
+      name: "get_weather",
+      description: "Get the current weather for a location",
+      input_schema: {
+        type: "object",
+        properties: {
+          location: {
+            type: "string",
+            description: "The city name",
+          },
+        },
+        required: ["location"],
+      },
+    },
+  ],
+  messages: [{ role: "user", content: "What's the weather in Paris?" }],
+});
+
+// Tool calls are logged with full input/output
+if (response.content[0].type === "tool_use") {
+  console.log(response.content[0].name);
+  console.log(response.content[0].input);
+}
+```
+
+## Vision
+
+Use Claude with images:
+
+```typescript
+import * as fs from "fs";
+
+const imageData = fs.readFileSync("./image.jpg").toString("base64");
+
+const response = await client.messages.create({
+  model: "claude-3-5-sonnet-20240620",
+  max_tokens: 1024,
+  messages: [
+    {
+      role: "user",
+      content: [
+        {
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: "image/jpeg",
+            data: imageData,
+          },
+        },
+        {
+          type: "text",
+          text: "What's in this image?",
+        },
+      ],
+    },
+  ],
+});
+```
+
+## Session Tracking
+
+Track multi-turn conversations:
+
+```typescript
+import { v4 as uuidv4 } from "uuid";
+
+const sessionId = uuidv4();
+const conversationHistory = [];
+
+// First message
+conversationHistory.push({
+  role: "user",
+  content: "Hello! I need help with my taxes.",
+});
+
+const response1 = await client.messages.create(
+  {
+    model: "claude-3-5-sonnet-20240620",
+    max_tokens: 1024,
+    messages: conversationHistory,
+  },
+  {
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Path": "/tax-help/greeting",
+      "Helicone-Session-Name": "Tax Assistance",
+    },
+  }
+);
+
+conversationHistory.push({
+  role: "assistant",
+  content: response1.content[0].text,
+});
+
+// Follow-up message
+conversationHistory.push({
+  role: "user",
+  content: "What deductions can I claim?",
+});
+
+const response2 = await client.messages.create(
+  {
+    model: "claude-3-5-sonnet-20240620",
+    max_tokens: 1024,
+    messages: conversationHistory,
+  },
+  {
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Path": "/tax-help/deductions",
+    },
+  }
+);
+```
+
+Learn more about [Session Tracking](/observability/sessions).
+
+## Custom Properties
+
+Add custom metadata to track important context:
+
+```typescript
+const response = await client.messages.create(
+  {
+    model: "claude-3-5-sonnet-20240620",
+    max_tokens: 1024,
+    messages: [{ role: "user", content: "Hello!" }],
+  },
+  {
+    headers: {
+      "Helicone-User-Id": "user-123",
+      "Helicone-Property-Environment": "production",
+      "Helicone-Property-App": "customer-support",
+      "Helicone-Property-Region": "us-east",
+    },
+  }
+);
+```
+
+## Using the AI Gateway
+
+Access Claude through the AI Gateway with OpenAI-compatible API:
+
+<Tabs>
+  <Tab title="OpenAI SDK">
+    ```typescript
+    import { OpenAI } from "openai";
+
+    const client = new OpenAI({
+      baseURL: "https://ai-gateway.helicone.ai",
+      apiKey: process.env.HELICONE_API_KEY,
+    });
+
+    // Use Claude with OpenAI SDK
+    const response = await client.chat.completions.create({
+      model: "claude-3-5-sonnet-20240620/anthropic",
+      messages: [{ role: "user", content: "Hello!" }],
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Anthropic SDK">
+    ```typescript
+    import Anthropic from "@anthropic-ai/sdk";
+
+    const client = new Anthropic({
+      apiKey: `Bearer ${process.env.HELICONE_API_KEY}`,
+      baseURL: "https://ai-gateway.helicone.ai",
+      defaultHeaders: {
+        "Helicone-Gateway-Body-Mapping": "NO_MAPPING",
+      },
+    });
+
+    // Use with fallbacks
+    const response = await client.messages.create({
+      model: "claude-3-5-sonnet-20240620/anthropic,claude-3-opus-20240229/bedrock",
+      max_tokens: 1024,
+      messages: [{ role: "user", content: "Hello!" }],
+    });
+    ```
+  </Tab>
+</Tabs>
+
+Learn more about the [AI Gateway](/gateway/overview).
+
+## AWS Bedrock
+
+Track Claude models on AWS Bedrock:
+
+```typescript
+import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
+
+const client = new BedrockRuntimeClient({
+  region: "us-east-1",
+});
+
+const command = new InvokeModelCommand({
+  modelId: "anthropic.claude-3-5-sonnet-20240620-v1:0",
+  body: JSON.stringify({
+    anthropic_version: "bedrock-2023-05-31",
+    max_tokens: 1024,
+    messages: [{ role: "user", content: "Hello!" }],
+  }),
+});
+
+// Route through Helicone by using the AI Gateway
+// See AI Gateway docs for Bedrock configuration
+```
+
+## Response Caching
+
+Reduce costs with Helicone's response caching:
+
+```typescript
+const response = await client.messages.create(
+  {
+    model: "claude-3-5-sonnet-20240620",
+    max_tokens: 1024,
+    messages: [{ role: "user", content: "What is 2+2?" }],
+  },
+  {
+    headers: {
+      "Helicone-Cache-Enabled": "true",
+    },
+  }
+);
+```
+
+Note: This is separate from Anthropic's prompt caching. Helicone caching caches entire responses.
+
+Learn more about [Response Caching](/features/caching).
+
+## Zero-Latency Integration
+
+For production applications, use async logging:
+
+```typescript
+import { HeliconeAsyncLogger } from "@helicone/async";
+import Anthropic from "@anthropic-ai/sdk";
+
+const logger = new HeliconeAsyncLogger({
+  apiKey: process.env.HELICONE_API_KEY,
+  providers: {
+    anthropic: Anthropic,
+  },
+});
+logger.init();
+
+// Use Anthropic SDK normally - no proxy latency
+const client = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+const response = await client.messages.create({
+  model: "claude-3-5-sonnet-20240620",
+  max_tokens: 1024,
+  messages: [{ role: "user", content: "Hello!" }],
+});
+```
+
+Learn more about [Async Logging](/integrations/async-logging).
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use environment variables">
+    Never hardcode API keys:
+    
+    ```bash
+    # .env
+    ANTHROPIC_API_KEY=sk-ant-...
+    HELICONE_API_KEY=sk-helicone-...
+    ```
+  </Accordion>
+  
+  <Accordion title="Track sessions and users">
+    Include session and user IDs:
+    
+    ```typescript
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-User-Id": userId,
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Leverage prompt caching">
+    Use Anthropic's prompt caching for large contexts:
+    
+    ```typescript
+    system: [
+      {
+        type: "text",
+        text: largeContext,
+        cache_control: { type: "ephemeral" },
+      },
+    ]
+    ```
+  </Accordion>
+  
+  <Accordion title="Monitor token usage">
+    Track both input and output tokens, plus cache usage:
+    
+    ```typescript
+    console.log(response.usage);
+    // {
+    //   input_tokens: 100,
+    //   output_tokens: 50,
+    //   cache_creation_input_tokens: 0,
+    //   cache_read_input_tokens: 0
+    // }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Requests not appearing in dashboard">
+    1. Verify your Helicone API key is correct
+    2. Check the `Helicone-Auth` header format: `Bearer sk-helicone-...`
+    3. Ensure you're using `https://anthropic.helicone.ai`
+    4. Confirm your Anthropic API key is valid
+  </Accordion>
+  
+  <Accordion title="Authentication errors">
+    - Pass Anthropic API key as `apiKey` parameter
+    - Pass Helicone API key in `Helicone-Auth` header
+    - Format: `Helicone-Auth: Bearer sk-helicone-...`
+  </Accordion>
+  
+  <Accordion title="Streaming not working">
+    - Ensure you're using the latest `@anthropic-ai/sdk` version
+    - Check that your base URL is correct
+    - Streaming works with both proxy and AI Gateway methods
+  </Accordion>
+  
+  <Accordion title="Prompt caching not showing">
+    - Prompt caching only works with Claude 3.5 Sonnet and later
+    - Cache blocks must be at least 1024 tokens
+    - View cache metrics in the Helicone dashboard
+  </Accordion>
+</AccordionGroup>
+
+## Supported Models
+
+Helicone supports all Anthropic models:
+
+- **Claude 3.5 Sonnet** (`claude-3-5-sonnet-20240620`)
+- **Claude 3 Opus** (`claude-3-opus-20240229`)
+- **Claude 3 Sonnet** (`claude-3-sonnet-20240229`)
+- **Claude 3 Haiku** (`claude-3-haiku-20240307`)
+- All future Claude models
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="AI Gateway" icon="network-wired" href="/gateway/overview">
+    Use Claude with the unified AI Gateway
+  </Card>
+  <Card title="Session Tracking" icon="diagram-project" href="/observability/sessions">
+    Track multi-turn conversations
+  </Card>
+  <Card title="Async Logging" icon="bolt" href="/integrations/async-logging">
+    Zero-latency integration
+  </Card>
+  <Card title="Custom Properties" icon="tag" href="/features/custom-properties">
+    Add custom metadata
+  </Card>
+</CardGroup>

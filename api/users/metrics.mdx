@@ -1,0 +1,179 @@
+---
+title: "Query User Metrics"
+sidebarTitle: "Query User Metrics"
+description: "Retrieve detailed user metrics with advanced filtering and pagination"
+openapi: post /v1/user/metrics/query
+---
+
+This endpoint provides comprehensive user metrics including activity patterns, token usage, and cost analytics. Use advanced filtering to segment users and pagination to handle large result sets.
+
+## Use Cases
+
+- Generate detailed user analytics reports
+- Identify most active users
+- Track user engagement over time
+- Calculate average requests per active day
+- Monitor per-user costs and token consumption
+
+## Request Body
+
+<ParamField body="filter" type="UserFilterNode" required>
+  Filter criteria for users. Can be "all" to retrieve all users, or a filter tree structure to specify conditions.
+</ParamField>
+
+<ParamField body="offset" type="number" required>
+  Number of records to skip for pagination (0-based)
+</ParamField>
+
+<ParamField body="limit" type="number" required>
+  Maximum number of records to return. Cannot exceed 1000.
+</ParamField>
+
+<ParamField body="timeFilter" type="object">
+  Time range for filtering data
+  
+  <ParamField body="timeFilter.startTimeUnixSeconds" type="number" required>
+    Start time as Unix timestamp in seconds
+  </ParamField>
+  
+  <ParamField body="timeFilter.endTimeUnixSeconds" type="number" required>
+    End time as Unix timestamp in seconds
+  </ParamField>
+</ParamField>
+
+<ParamField body="timeZoneDifferenceMinutes" type="number">
+  Time zone difference in minutes from UTC for time-based calculations
+</ParamField>
+
+<ParamField body="sort" type="SortLeafUsers">
+  Sorting configuration for the results
+</ParamField>
+
+## Response
+
+Returns a Result object containing user metrics data.
+
+<ResponseField name="data" type="object">
+  User metrics response object
+  
+  <ResponseField name="data.users" type="UserMetricsResult[]">
+    Array of user metrics objects
+    
+    <ResponseField name="data.users[].id" type="string">
+      Internal user record ID
+    </ResponseField>
+    
+    <ResponseField name="data.users[].user_id" type="string">
+      The user identifier
+    </ResponseField>
+    
+    <ResponseField name="data.users[].active_for" type="number">
+      Number of days the user has been active
+    </ResponseField>
+    
+    <ResponseField name="data.users[].first_active" type="string">
+      ISO 8601 timestamp of first activity
+    </ResponseField>
+    
+    <ResponseField name="data.users[].last_active" type="string">
+      ISO 8601 timestamp of last activity
+    </ResponseField>
+    
+    <ResponseField name="data.users[].total_requests" type="number">
+      Total number of requests made by the user
+    </ResponseField>
+    
+    <ResponseField name="data.users[].average_requests_per_day_active" type="number">
+      Average number of requests per active day
+    </ResponseField>
+    
+    <ResponseField name="data.users[].average_tokens_per_request" type="number">
+      Average total tokens (prompt + completion) per request
+    </ResponseField>
+    
+    <ResponseField name="data.users[].total_completion_tokens" type="number">
+      Total completion tokens generated
+    </ResponseField>
+    
+    <ResponseField name="data.users[].total_prompt_tokens" type="number">
+      Total prompt tokens consumed
+    </ResponseField>
+    
+    <ResponseField name="data.users[].cost" type="number">
+      Total cost in USD
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="data.count" type="number">
+    Total number of users matching the filter (for pagination)
+  </ResponseField>
+  
+  <ResponseField name="data.hasUsers" type="boolean">
+    Whether any users were found
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="error" type="string | null">
+  Error message if the request failed, null otherwise
+</ResponseField>
+
+## Example Request
+
+```bash
+curl --request POST \
+  --url https://api.helicone.ai/v1/user/metrics/query \
+  --header 'Authorization: Bearer <YOUR_API_KEY>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "filter": "all",
+    "offset": 0,
+    "limit": 50,
+    "timeFilter": {
+      "startTimeUnixSeconds": 1704067200,
+      "endTimeUnixSeconds": 1706745600
+    }
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "data": {
+    "users": [
+      {
+        "id": "rec_123",
+        "user_id": "user_123",
+        "active_for": 30,
+        "first_active": "2024-01-01T00:00:00Z",
+        "last_active": "2024-01-30T23:59:59Z",
+        "total_requests": 450,
+        "average_requests_per_day_active": 15.0,
+        "average_tokens_per_request": 850.5,
+        "total_completion_tokens": 192000,
+        "total_prompt_tokens": 191250,
+        "cost": 12.45
+      }
+    ],
+    "count": 120,
+    "hasUsers": true
+  },
+  "error": null
+}
+```
+
+## Error Response
+
+```json
+{
+  "data": null,
+  "error": "Limit cannot be greater than 1000"
+}
+```
+
+## Notes
+
+- Maximum limit is 1000 users per request
+- Use offset and limit for pagination through large result sets
+- Active days are calculated based on days with at least one request
+- Costs are calculated based on model pricing at the time of each request

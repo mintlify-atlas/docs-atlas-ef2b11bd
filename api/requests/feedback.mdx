@@ -1,0 +1,403 @@
+---
+title: "Add Feedback to Request"
+api: "POST https://api.helicone.ai/v1/request/{requestId}/feedback"
+description: "Add thumbs up/down feedback to a specific request"
+---
+
+Add user feedback to a request to track quality and satisfaction. This endpoint allows you to mark requests as positive or negative, which can be used for filtering, analytics, and improving your LLM application.
+
+<Note>
+  Feedback ratings are boolean values: `true` for positive (thumbs up) and `false` for negative (thumbs down).
+</Note>
+
+## Path Parameters
+
+<ParamField path="requestId" type="string" required>
+  The unique identifier of the request to add feedback to. This can be found in the `Helicone-Id` response header when making requests through Helicone.
+  
+  Example: `req_abc123def456`
+</ParamField>
+
+## Request Body
+
+<ParamField body="rating" type="boolean" required>
+  The feedback rating to apply to the request.
+  
+  - `true` - Positive feedback (thumbs up)
+  - `false` - Negative feedback (thumbs down)
+</ParamField>
+
+## Response
+
+<ResponseField name="data" type="null">
+  Returns null on success.
+</ResponseField>
+
+<ResponseField name="error" type="string | null">
+  Error message if the request failed.
+</ResponseField>
+
+## Examples
+
+### Add Positive Feedback
+
+Mark a request as positive:
+
+```bash cURL
+curl --request POST \
+  --url https://api.helicone.ai/v1/request/req_abc123def456/feedback \
+  --header 'Authorization: Bearer <HELICONE_API_KEY>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+  "rating": true
+}'
+```
+
+```typescript TypeScript
+const requestId = 'req_abc123def456';
+
+const response = await fetch(
+  `https://api.helicone.ai/v1/request/${requestId}/feedback`,
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      rating: true
+    })
+  }
+);
+
+const result = await response.json();
+console.log('Feedback added successfully');
+```
+
+```python Python
+import os
+import requests
+
+request_id = "req_abc123def456"
+
+response = requests.post(
+    f"https://api.helicone.ai/v1/request/{request_id}/feedback",
+    headers={
+        "Authorization": f"Bearer {os.environ['HELICONE_API_KEY']}",
+        "Content-Type": "application/json"
+    },
+    json={
+        "rating": True
+    }
+)
+
+result = response.json()
+print("Feedback added successfully")
+```
+
+### Add Negative Feedback
+
+Mark a request as negative:
+
+```bash cURL
+curl --request POST \
+  --url https://api.helicone.ai/v1/request/req_abc123def456/feedback \
+  --header 'Authorization: Bearer <HELICONE_API_KEY>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+  "rating": false
+}'
+```
+
+```typescript TypeScript
+const requestId = 'req_abc123def456';
+
+const response = await fetch(
+  `https://api.helicone.ai/v1/request/${requestId}/feedback`,
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      rating: false
+    })
+  }
+);
+
+const result = await response.json();
+console.log('Negative feedback recorded');
+```
+
+## Use Cases
+
+### User Feedback Collection
+
+Capture user feedback in your application:
+
+```typescript
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'https://gateway.helicone.ai/v1',
+  defaultHeaders: {
+    'Helicone-Auth': `Bearer ${process.env.HELICONE_API_KEY}`
+  }
+});
+
+// Make a request and capture the request ID
+const { data, response } = await client.chat.completions
+  .create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: 'Explain quantum computing' }]
+  })
+  .withResponse();
+
+const requestId = response.headers.get('helicone-id');
+
+// Display response to user
+const assistantMessage = data.choices[0].message.content;
+console.log('Response:', assistantMessage);
+
+// Later, when user provides feedback (e.g., thumbs up/down button)
+const userFeedback = true; // User clicked thumbs up
+
+await fetch(
+  `https://api.helicone.ai/v1/request/${requestId}/feedback`,
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ rating: userFeedback })
+  }
+);
+```
+
+### Feedback-Based Analytics
+
+Query requests filtered by feedback rating:
+
+```typescript
+// Query all requests with positive feedback
+const queryPositiveFeedback = async () => {
+  const response = await fetch(
+    'https://api.helicone.ai/v1/request/query',
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        filter: {
+          feedback: {
+            rating: {
+              equals: true
+            }
+          }
+        },
+        limit: 100
+      })
+    }
+  );
+  
+  const result = await response.json();
+  console.log(`Found ${result.data.length} requests with positive feedback`);
+  return result.data;
+};
+
+// Query all requests with negative feedback
+const queryNegativeFeedback = async () => {
+  const response = await fetch(
+    'https://api.helicone.ai/v1/request/query',
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        filter: {
+          feedback: {
+            rating: {
+              equals: false
+            }
+          }
+        },
+        limit: 100
+      })
+    }
+  );
+  
+  const result = await response.json();
+  console.log(`Found ${result.data.length} requests with negative feedback`);
+  return result.data;
+};
+```
+
+### A/B Testing with Feedback
+
+Track feedback across different prompt versions:
+
+```typescript
+// Version A
+const testPromptA = async () => {
+  const { data, response } = await client.chat.completions
+    .create(
+      {
+        model: 'gpt-4',
+        messages: [{
+          role: 'system',
+          content: 'You are a helpful assistant.'
+        }, {
+          role: 'user',
+          content: userQuery
+        }]
+      },
+      {
+        headers: {
+          'Helicone-Property-Prompt-Version': 'A',
+          'Helicone-Property-Experiment': 'prompt-test-1'
+        }
+      }
+    )
+    .withResponse();
+  
+  return {
+    requestId: response.headers.get('helicone-id'),
+    content: data.choices[0].message.content
+  };
+};
+
+// Version B
+const testPromptB = async () => {
+  const { data, response } = await client.chat.completions
+    .create(
+      {
+        model: 'gpt-4',
+        messages: [{
+          role: 'system',
+          content: 'You are a concise assistant that provides brief answers.'
+        }, {
+          role: 'user',
+          content: userQuery
+        }]
+      },
+      {
+        headers: {
+          'Helicone-Property-Prompt-Version': 'B',
+          'Helicone-Property-Experiment': 'prompt-test-1'
+        }
+      }
+    )
+    .withResponse();
+  
+  return {
+    requestId: response.headers.get('helicone-id'),
+    content: data.choices[0].message.content
+  };
+};
+
+// Collect feedback and compare
+const collectFeedback = async (requestId: string, userRating: boolean) => {
+  await fetch(
+    `https://api.helicone.ai/v1/request/${requestId}/feedback`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ rating: userRating })
+    }
+  );
+};
+```
+
+### Automated Feedback Based on Criteria
+
+Automatically add feedback based on response characteristics:
+
+```typescript
+const addAutomatedFeedback = async (requestId: string, responseData: any) => {
+  // Example: Mark as negative if response is too short
+  const responseText = responseData.choices[0].message.content;
+  const isGoodResponse = responseText.length > 50 && 
+                         !responseText.includes('[error]');
+  
+  await fetch(
+    `https://api.helicone.ai/v1/request/${requestId}/feedback`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ rating: isGoodResponse })
+    }
+  );
+};
+```
+
+## Updating Feedback
+
+You can update existing feedback by making another POST request to the same endpoint with a new rating value. The latest rating will override the previous one.
+
+```typescript
+// Initial feedback
+await fetch(
+  `https://api.helicone.ai/v1/request/${requestId}/feedback`,
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ rating: true })
+  }
+);
+
+// Update feedback later
+await fetch(
+  `https://api.helicone.ai/v1/request/${requestId}/feedback`,
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ rating: false })
+  }
+);
+```
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Get Request by ID" icon="magnifying-glass" href="/api/requests/get">
+    Retrieve request details including feedback
+  </Card>
+  
+  <Card title="Query Requests" icon="filter" href="/api/requests/query">
+    Query requests filtered by feedback rating
+  </Card>
+  
+  <Card title="Add Scores" icon="star" href="/api/requests/scores">
+    Add detailed evaluation scores instead of simple ratings
+  </Card>
+  
+  <Card title="Add Properties" icon="tag" href="/api/requests/properties">
+    Add custom properties to requests
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+- **Capture Context**: Use custom properties to tag requests before collecting feedback for better analysis
+- **Track Changes**: If users can change their feedback, consider logging the change history separately
+- **Combine with Scores**: Use feedback for quick user ratings and scores for detailed evaluation metrics
+- **Filter by Feedback**: Regularly review negatively rated requests to identify areas for improvement
+- **A/B Testing**: Use feedback to compare different prompt versions or model configurations

@@ -1,0 +1,428 @@
+---
+title: "Provider Routing"
+description: "Understand how Helicone routes requests across AI providers"
+---
+
+## How Routing Works
+
+Helicone AI Gateway intelligently routes your requests to the best available provider based on:
+
+- **Authentication method** (BYOK vs PTB)
+- **Provider priority** (OpenAI, Anthropic, etc.)
+- **Cost optimization**
+- **Availability and rate limits**
+- **Explicit routing rules**
+
+## Routing Priority
+
+When you specify a model without a provider, the gateway builds a list of attempts and tries them in order:
+
+<Steps>
+  <Step title="BYOK Attempts First">
+    If you have provider keys configured, BYOK attempts are prioritized:
+    
+    ```typescript
+    // You have OpenAI and Anthropic keys configured
+    model: "gpt-4o-mini"
+    // Tries: OpenAI BYOK → PTB providers
+    ```
+  </Step>
+
+  <Step title="Provider Priority">
+    Within BYOK and PTB groups, providers are prioritized by:
+    1. Native provider (e.g., OpenAI for GPT models)
+    2. Major cloud providers (Azure, Bedrock, Vertex)
+    3. Alternative providers (DeepInfra, OpenRouter, etc.)
+  </Step>
+
+  <Step title="Fallback Chain">
+    If a request fails, the gateway automatically tries the next provider in the list.
+  </Step>
+</Steps>
+
+## Routing Examples
+
+### Automatic Routing
+
+Let the gateway choose the best provider:
+
+```typescript
+const response = await client.chat.completions.create({
+  model: "gpt-4o-mini",
+  messages: [{ role: "user", content: "Hello!" }],
+});
+```
+
+**Routing behavior:**
+- If you have an OpenAI BYOK key: Uses OpenAI directly
+- If no BYOK key: Uses PTB (Helicone billing)
+- Automatically tries alternatives if the first attempt fails
+
+### Explicit Provider Routing
+
+Specify the exact provider you want:
+
+```typescript
+// OpenAI direct
+model: "gpt-4o/openai"
+
+// Azure OpenAI
+model: "gpt-4o/azure"
+
+// AWS Bedrock
+model: "claude-3-7-sonnet-20250219/bedrock"
+
+// Anthropic direct
+model: "claude-sonnet-4/anthropic"
+
+// DeepInfra
+model: "llama-3.3-70b/deepinfra"
+```
+
+<Info>
+Explicit routing still respects BYOK → PTB priority. If you have a BYOK key for the specified provider, it's used first.
+</Info>
+
+### Multi-Model Fallback
+
+Specify multiple models to try in order:
+
+```typescript
+const response = await client.chat.completions.create({
+  model: "gpt-4o/openai,gpt-4o/azure,gpt-4o/deepinfra",
+  messages: [{ role: "user", content: "Hello!" }],
+});
+```
+
+**Behavior:**
+1. Tries OpenAI BYOK (if configured)
+2. Falls back to OpenAI PTB
+3. Then tries Azure BYOK (if configured)
+4. Then Azure PTB
+5. Finally tries DeepInfra
+
+<Tip>
+See [Fallbacks](/gateway/fallbacks) for more advanced fallback strategies.
+</Tip>
+
+### Provider Exclusions
+
+Exclude specific providers from automatic routing:
+
+```typescript
+// Exclude Anthropic from all routing
+model: "!anthropic,gpt-4o-mini"
+
+// Exclude multiple providers
+model: "!anthropic,!deepinfra,gpt-4o-mini"
+```
+
+The `!provider` syntax excludes providers globally for all models in the comma-separated list.
+
+<CodeGroup>
+```typescript Single Exclusion
+// Use gpt-4o-mini from any provider except Anthropic
+const response = await client.chat.completions.create({
+  model: "!anthropic,gpt-4o-mini",
+  messages: [{ role: "user", content: "Hello!" }],
+});
+```
+
+```typescript Multiple Exclusions
+// Exclude Anthropic and DeepInfra
+const response = await client.chat.completions.create({
+  model: "!anthropic,!deepinfra,gpt-4o-mini",
+  messages: [{ role: "user", content: "Hello!" }],
+});
+```
+
+```typescript Multiple Models
+// Exclusion applies to all models in the list
+const response = await client.chat.completions.create({
+  model: "!anthropic,gpt-4o-mini,gpt-4o",
+  messages: [{ role: "user", content: "Hello!" }],
+});
+```
+</CodeGroup>
+
+## Provider Priority Order
+
+The gateway uses the following priority order for routing (within BYOK and PTB groups):
+
+<Tabs>
+  <Tab title="OpenAI Models">
+    For GPT models (gpt-4o, gpt-5, o1, etc.):
+    
+    1. **OpenAI** (native provider)
+    2. **Azure OpenAI**
+    3. **Alternative providers** (DeepInfra, OpenRouter, etc.)
+  </Tab>
+
+  <Tab title="Anthropic Models">
+    For Claude models:
+    
+    1. **Anthropic** (native provider)
+    2. **AWS Bedrock**
+    3. **Google Vertex AI**
+    4. **Alternative providers**
+  </Tab>
+
+  <Tab title="Google Models">
+    For Gemini models:
+    
+    1. **Google AI Studio** (native provider)
+    2. **Google Vertex AI**
+    3. **Alternative providers**
+  </Tab>
+
+  <Tab title="Meta Models">
+    For Llama models:
+    
+    1. **AWS Bedrock**
+    2. **Google Vertex AI**
+    3. **DeepInfra**
+    4. **Together AI**
+    5. **Other providers**
+  </Tab>
+</Tabs>
+
+<Note>
+This priority order is implemented in the `AttemptBuilder` class and can be customized with explicit routing or exclusions.
+</Note>
+
+## BYOK vs PTB Routing
+
+### BYOK (Bring Your Own Key)
+
+When you configure provider keys in [Settings → API Keys](https://helicone.ai/settings/keys):
+
+- **Priority**: BYOK attempts always come first
+- **Billing**: Direct from the provider
+- **Failover**: Falls back to PTB if BYOK fails
+
+```typescript
+// With OpenAI BYOK configured
+model: "gpt-4o-mini"
+// 1. Tries OpenAI BYOK
+// 2. Falls back to OpenAI PTB
+// 3. Falls back to alternative providers
+```
+
+### PTB (Pass-Through Billing)
+
+When using Helicone's API key without BYOK:
+
+- **Priority**: After BYOK attempts
+- **Billing**: Through Helicone (add credits at [helicone.ai/credits](https://us.helicone.ai/credits))
+- **Authentication**: Single API key for all providers
+
+```typescript
+// Without BYOK keys
+model: "gpt-4o-mini"
+// 1. Tries OpenAI PTB
+// 2. Falls back to alternative PTB providers
+```
+
+## Regional Routing
+
+Some providers support regional endpoints:
+
+### AWS Bedrock
+
+```typescript
+// Specific region
+model: "us.anthropic.claude-3-7-sonnet-20250219-v1:0/bedrock"
+
+// With fallback to Anthropic
+model: "us.anthropic.claude-3-7-sonnet-20250219-v1:0/bedrock,claude-3-7-sonnet-20250219/anthropic"
+```
+
+### Azure OpenAI
+
+Configure Azure deployments in [Settings → API Keys](https://helicone.ai/settings/keys), then:
+
+```typescript
+model: "gpt-4o/azure"
+```
+
+## Cost-Optimized Routing
+
+The gateway considers provider pricing when routing:
+
+```typescript
+// Automatically uses the lowest cost provider
+model: "llama-3.3-70b"
+// Compares: DeepInfra, Together AI, Bedrock, etc.
+```
+
+<CardGroup cols={2}>
+  <Card title="Cost Tracking" icon="dollar-sign">
+    View costs by provider in the [Helicone dashboard](https://helicone.ai/dashboard)
+  </Card>
+  <Card title="LLM Cost API" icon="database">
+    Access pricing data at [helicone.ai/llm-cost](https://www.helicone.ai/llm-cost)
+  </Card>
+</CardGroup>
+
+## Routing Observability
+
+Track which providers were attempted in the Helicone dashboard:
+
+<Steps>
+  <Step title="View Request Details">
+    Open any request in [Requests](https://helicone.ai/requests)
+  </Step>
+
+  <Step title="Check Provider">
+    See which provider was used and if fallbacks occurred
+  </Step>
+
+  <Step title="Analyze Patterns">
+    Use filters to analyze routing patterns across requests
+  </Step>
+</Steps>
+
+## Advanced Routing
+
+### Model-Specific Provider Routing
+
+Route different models to different providers:
+
+```typescript
+// Use Bedrock for Claude, OpenAI for GPT
+const claudeResponse = await client.chat.completions.create({
+  model: "claude-sonnet-4/bedrock",
+  messages: [{ role: "user", content: "Hello!" }],
+});
+
+const gptResponse = await client.chat.completions.create({
+  model: "gpt-4o/openai",
+  messages: [{ role: "user", content: "Hello!" }],
+});
+```
+
+### Conditional Routing
+
+Route based on application logic:
+
+```typescript
+function selectModel(priority: "cost" | "speed" | "quality") {
+  switch (priority) {
+    case "cost":
+      return "gpt-4o-mini/deepinfra,gpt-4o-mini";
+    case "speed":
+      return "llama-3.3-70b/groq,gpt-4o-mini";
+    case "quality":
+      return "gpt-4o,claude-sonnet-4";
+  }
+}
+
+const response = await client.chat.completions.create({
+  model: selectModel("cost"),
+  messages: [{ role: "user", content: "Hello!" }],
+});
+```
+
+## Routing Errors
+
+The gateway returns errors when routing fails:
+
+<ResponseField name="400 Bad Request" type="error">
+  Invalid model or provider name:
+  ```json
+  {
+    "error": {
+      "message": "No available providers for the requested models",
+      "type": "request_failed"
+    }
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="401 Unauthorized" type="error">
+  Invalid or missing API key:
+  ```json
+  {
+    "error": {
+      "message": "Invalid Helicone API key",
+      "type": "authentication_failed"
+    }
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="429 Rate Limited" type="error">
+  Rate limit exceeded or insufficient credits:
+  ```json
+  {
+    "error": {
+      "message": "Insufficient credit limit",
+      "type": "insufficient_credit_limit"
+    }
+  }
+  ```
+</ResponseField>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Automatic Routing for Flexibility" icon="wand-magic-sparkles">
+    Let the gateway choose providers automatically:
+    
+    ```typescript
+    model: "gpt-4o-mini"  // Best for most use cases
+    ```
+    
+    This provides:
+    - Automatic BYOK → PTB fallback
+    - Cost optimization
+    - Built-in resilience
+  </Accordion>
+
+  <Accordion title="Explicit Routing for Compliance" icon="shield-check">
+    Use explicit providers when you need:
+    
+    ```typescript
+    model: "gpt-4o/azure"  // Required for data residency
+    ```
+    
+    - Data residency requirements
+    - Specific SLAs
+    - Regulatory compliance
+  </Accordion>
+
+  <Accordion title="Configure BYOK for Cost Control" icon="key">
+    Add provider keys for:
+    - Better cost control
+    - Direct provider billing
+    - Priority routing
+    
+    Configure at [Settings → API Keys](https://helicone.ai/settings/keys)
+  </Accordion>
+
+  <Accordion title="Monitor Routing Patterns" icon="chart-line">
+    Use the Helicone dashboard to:
+    - Track provider usage
+    - Identify cost optimization opportunities
+    - Detect routing issues
+    
+    View at [Helicone Dashboard](https://helicone.ai/dashboard)
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Fallbacks" icon="shield" href="/gateway/fallbacks">
+    Configure automatic failover strategies
+  </Card>
+  <Card title="Getting Started" icon="rocket" href="/gateway/getting-started">
+    Start using the AI Gateway
+  </Card>
+  <Card title="Browse Models" icon="grid" href="https://www.helicone.ai/models">
+    Explore all available models
+  </Card>
+  <Card title="Cost API" icon="dollar-sign" href="https://www.helicone.ai/llm-cost">
+    Access provider pricing data
+  </Card>
+</CardGroup>

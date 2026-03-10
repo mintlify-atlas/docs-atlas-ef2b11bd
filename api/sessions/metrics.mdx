@@ -1,0 +1,209 @@
+---
+title: "Query Session Metrics"
+sidebarTitle: "Query Metrics"
+description: "Retrieve detailed performance metrics and statistical distributions for sessions"
+openapi: post /v1/session/metrics/query
+---
+
+## Overview
+
+The Session Metrics endpoint provides statistical analysis of session performance, including percentile distributions for session count, duration, and cost. This is useful for understanding typical session patterns and identifying outliers.
+
+## Request Parameters
+
+<ParamField body="nameContains" type="string">
+  Filter sessions by session name (partial match)
+</ParamField>
+
+<ParamField body="timezoneDifference" type="number" required>
+  Timezone offset in minutes from UTC
+</ParamField>
+
+<ParamField body="pSize" type="string" default="p75">
+  Percentile size for histogram calculations
+  
+  Options: `p50`, `p75`, `p95`, `p99`, `p99.9`
+</ParamField>
+
+<ParamField body="useInterquartile" type="boolean" default="false">
+  Use interquartile range for outlier detection
+</ParamField>
+
+<ParamField body="timeFilter" type="object">
+  Time range filter for the metrics query
+  
+  <ParamField body="startTimeUnixMs" type="number">
+    Start time in Unix milliseconds
+  </ParamField>
+  
+  <ParamField body="endTimeUnixMs" type="number">
+    End time in Unix milliseconds
+  </ParamField>
+</ParamField>
+
+<ParamField body="filter" type="object">
+  Advanced filter node for complex queries
+</ParamField>
+
+## Response Fields
+
+<ResponseField name="data" type="object">
+  Session metrics data
+  
+  <ResponseField name="session_count" type="array">
+    Histogram data for request counts per session
+    
+    <ResponseField name="bucket" type="number">
+      Request count bucket
+    </ResponseField>
+    
+    <ResponseField name="frequency" type="number">
+      Number of sessions in this bucket
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="session_duration" type="array">
+    Histogram data for session duration in seconds
+    
+    <ResponseField name="bucket" type="number">
+      Duration bucket (in seconds)
+    </ResponseField>
+    
+    <ResponseField name="frequency" type="number">
+      Number of sessions in this bucket
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="session_cost" type="array">
+    Histogram data for session costs
+    
+    <ResponseField name="bucket" type="number">
+      Cost bucket (in USD)
+    </ResponseField>
+    
+    <ResponseField name="frequency" type="number">
+      Number of sessions in this bucket
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="average" type="object">
+    Average metrics across all sessions
+    
+    <ResponseField name="session_count" type="array">
+      Average request count per session over time
+      
+      <ResponseField name="time" type="string">
+        Timestamp
+      </ResponseField>
+      
+      <ResponseField name="value" type="number">
+        Average count
+      </ResponseField>
+    </ResponseField>
+    
+    <ResponseField name="session_duration" type="array">
+      Average session duration over time
+      
+      <ResponseField name="time" type="string">
+        Timestamp
+      </ResponseField>
+      
+      <ResponseField name="value" type="number">
+        Average duration in seconds
+      </ResponseField>
+    </ResponseField>
+    
+    <ResponseField name="session_cost" type="array">
+      Average session cost over time
+      
+      <ResponseField name="time" type="string">
+        Timestamp
+      </ResponseField>
+      
+      <ResponseField name="value" type="number">
+        Average cost in USD
+      </ResponseField>
+    </ResponseField>
+  </ResponseField>
+</ResponseField>
+
+## Example Request
+
+```bash
+curl -X POST https://api.helicone.ai/v1/session/metrics/query \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nameContains": "production",
+    "timezoneDifference": 0,
+    "pSize": "p95",
+    "useInterquartile": false,
+    "timeFilter": {
+      "startTimeUnixMs": 1704067200000,
+      "endTimeUnixMs": 1704153600000
+    },
+    "filter": "all"
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "data": {
+    "session_count": [
+      { "bucket": 1, "frequency": 45 },
+      { "bucket": 5, "frequency": 120 },
+      { "bucket": 10, "frequency": 80 },
+      { "bucket": 20, "frequency": 35 }
+    ],
+    "session_duration": [
+      { "bucket": 60, "frequency": 90 },
+      { "bucket": 300, "frequency": 150 },
+      { "bucket": 600, "frequency": 40 }
+    ],
+    "session_cost": [
+      { "bucket": 0.001, "frequency": 100 },
+      { "bucket": 0.01, "frequency": 120 },
+      { "bucket": 0.1, "frequency": 60 }
+    ],
+    "average": {
+      "session_count": [
+        { "time": "2024-01-01T00:00:00Z", "value": 7.5 },
+        { "time": "2024-01-01T01:00:00Z", "value": 8.2 }
+      ],
+      "session_duration": [
+        { "time": "2024-01-01T00:00:00Z", "value": 245.5 },
+        { "time": "2024-01-01T01:00:00Z", "value": 267.3 }
+      ],
+      "session_cost": [
+        { "time": "2024-01-01T00:00:00Z", "value": 0.0085 },
+        { "time": "2024-01-01T01:00:00Z", "value": 0.0092 }
+      ]
+    }
+  },
+  "error": null
+}
+```
+
+## Understanding Percentiles
+
+The `pSize` parameter controls which percentile to use for histogram bucketing:
+
+- **p50 (median)**: Half of sessions fall below this value
+- **p75**: 75% of sessions fall below this value  
+- **p95**: 95% of sessions fall below this value - useful for SLA monitoring
+- **p99**: 99% of sessions fall below this value - helps identify outliers
+- **p99.9**: Captures extreme outliers
+
+## Use Cases
+
+- **Performance monitoring**: Track session duration trends over time
+- **Cost analysis**: Understand cost distribution across sessions
+- **Capacity planning**: Identify typical session patterns for scaling
+- **Anomaly detection**: Use high percentiles (p95, p99) to spot unusual behavior
+- **SLA compliance**: Monitor percentile-based service level objectives
+
+## Interquartile Range
+
+When `useInterquartile` is set to `true`, the metrics use the interquartile range (IQR) method for outlier detection. This provides a more robust statistical view by focusing on the middle 50% of data and reducing the impact of extreme outliers.

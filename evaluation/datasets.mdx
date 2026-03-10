@@ -1,0 +1,548 @@
+---
+title: "Datasets"
+sidebarTitle: "Datasets"
+description: "Create evaluation and fine-tuning datasets from production LLM traffic"
+---
+
+Helicone Datasets let you capture, curate, and export production LLM requests for evaluation, fine-tuning, and analysis. Transform your production logs into high-quality training data with just a few clicks.
+
+## Why Use Datasets
+
+<CardGroup cols={2}>
+<Card title="Fine-Tuning" icon="brain">
+  Create training datasets from your best production requests to fine-tune custom models
+</Card>
+<Card title="Model Evaluation" icon="chart-bar">
+  Build consistent test sets to evaluate model performance and compare versions
+</Card>
+<Card title="Quality Control" icon="shield-check">
+  Curate high-quality examples to improve prompt engineering and model outputs
+</Card>
+<Card title="Data Analysis" icon="magnifying-glass">
+  Export structured data for external analysis, research, and compliance
+</Card>
+</CardGroup>
+
+## Quick Start
+
+<Steps>
+<Step title="Filter production requests">
+  Use [custom properties](/features/advanced-usage/custom-properties), scores, or feedback ratings to find your best examples
+  
+  <Frame>
+    <img 
+      src="/images/datasets/filters.webp" 
+      alt="Filtering requests with custom properties and search criteria"
+    />
+  </Frame>
+</Step>
+
+<Step title="Select requests to include">
+  Check boxes next to requests you want in your dataset
+  
+  <Frame>
+    <img 
+      src="/images/datasets/datasets-select.webp" 
+      alt="Selecting multiple requests to add to dataset"
+    />
+  </Frame>
+</Step>
+
+<Step title="Create or add to dataset">
+  Click "Add to Dataset" to create a new dataset or add to an existing one
+  
+  <Frame>
+    <img 
+      src="/images/datasets/dataset-add.webp" 
+      alt="Adding selected requests to a dataset"
+    />
+  </Frame>
+</Step>
+
+<Step title="Curate and export">
+  Review examples, remove poor quality ones, and export in your preferred format
+</Step>
+</Steps>
+
+## Creating Datasets
+
+### From the Dashboard
+
+The easiest way to build datasets is through the Helicone UI:
+
+1. Navigate to [helicone.ai/requests](https://us.helicone.ai/requests)
+2. Apply filters to find high-quality examples:
+   - **Custom properties**: Tag production traffic (e.g., `feature: "customer-support"`)
+   - **Scores**: Filter by evaluation metrics (e.g., `accuracy > 90`)
+   - **Feedback**: Select highly-rated responses (e.g., `feedback: true`)
+   - **User**: Focus on specific users or use cases
+3. Select requests using checkboxes
+4. Click "Add to Dataset" and choose or create a dataset
+
+### Via API
+
+Create and manage datasets programmatically for automated workflows:
+
+<Tabs>
+<Tab title="Create Dataset">
+```typescript
+// Create a new dataset with requests
+const response = await fetch('https://api.helicone.ai/v1/helicone-dataset', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${HELICONE_API_KEY}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    datasetName: 'Customer Support Q1 2024',
+    requestIds: [
+      'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+      '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+      '6ba7b811-9dad-11d1-80b4-00c04fd430c9'
+    ],
+    meta: {
+      description: 'High-quality customer support examples',
+      tags: ['support', 'q1-2024']
+    }
+  })
+});
+
+const { datasetId } = await response.json();
+console.log('Created dataset:', datasetId);
+```
+</Tab>
+
+<Tab title="Add Requests">
+```typescript
+// Add more requests to existing dataset
+const response = await fetch(
+  `https://api.helicone.ai/v1/helicone-dataset/${datasetId}/mutate`,
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${HELICONE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      addRequests: ['new-request-id-1', 'new-request-id-2'],
+      removeRequests: [] // Optional: remove requests
+    })
+  }
+);
+```
+</Tab>
+
+<Tab title="Query Dataset">
+```typescript
+// Retrieve dataset contents
+const response = await fetch(
+  `https://api.helicone.ai/v1/helicone-dataset/${datasetId}/query`,
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${HELICONE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      limit: 100,
+      offset: 0
+    })
+  }
+);
+
+const rows = await response.json();
+console.log('Dataset rows:', rows.length);
+```
+</Tab>
+
+<Tab title="Update Request">
+```typescript
+// Edit request/response in dataset
+const response = await fetch(
+  `https://api.helicone.ai/v1/helicone-dataset/${datasetId}/request/${requestId}`,
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${HELICONE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      requestBody: {
+        messages: [{
+          role: 'user',
+          content: 'Updated prompt text'
+        }]
+      },
+      responseBody: {
+        choices: [{
+          message: {
+            role: 'assistant',
+            content: 'Updated response text'
+          }
+        }]
+      }
+    })
+  }
+);
+```
+</Tab>
+</Tabs>
+
+### Rate Limits
+
+<Warning>
+**Dataset creation limits**: You can add up to 1,000 dataset rows per day per organization. The limit resets at midnight UTC.
+</Warning>
+
+## Curating Quality Datasets
+
+### The Curation Process
+
+Raw production logs contain noise—curation transforms them into valuable training data:
+
+<Steps>
+<Step title="Start broad, then narrow">
+  Add many potential examples initially. It's easier to remove poor examples than to find good ones later.
+</Step>
+
+<Step title="Review each example">
+  <Frame>
+    <img 
+      src="/images/datasets/datasets-edit.webp" 
+      alt="Dataset curation interface showing request details for review"
+    />
+  </Frame>
+
+  Examine each request/response pair for:
+  - **Accuracy**: Is the response correct and helpful?
+  - **Consistency**: Does it match the style and format you want?
+  - **Completeness**: Does it fully address the user's request?
+  - **Relevance**: Is this the behavior you want to reinforce?
+</Step>
+
+<Step title="Remove poor examples">
+  Delete requests that contain:
+  - Incorrect or misleading responses
+  - Off-topic or irrelevant content
+  - Inconsistent formatting or style
+  - Edge cases that might confuse the model
+  - Sensitive or inappropriate content
+</Step>
+
+<Step title="Balance your dataset">
+  Ensure you have:
+  - Examples covering all common use cases
+  - Both simple and complex queries
+  - Appropriate distribution matching real usage patterns
+  - Diverse input styles and edge cases
+</Step>
+</Steps>
+
+<Note>
+**Quality beats quantity**: 50-100 carefully curated examples often outperform thousands of uncurated ones. Focus on consistency and correctness over volume.
+</Note>
+
+### Dataset Dashboard
+
+Manage all your datasets at [helicone.ai/datasets](https://us.helicone.ai/datasets):
+
+<Frame caption="Manage all your curated datasets in one place">
+  <img 
+    src="/images/datasets/datasets-dashboard.webp" 
+    alt="Helicone datasets dashboard with list of datasets and their metadata"
+  />
+</Frame>
+
+From the dashboard you can:
+- **Track progress**: Monitor dataset size and last updated time
+- **Access datasets**: Click to view and curate contents
+- **Export data**: Download datasets when ready for fine-tuning
+- **Delete datasets**: Remove datasets you no longer need
+
+## Exporting Data
+
+### Export Formats
+
+Download your datasets in formats optimized for different use cases:
+
+<Frame caption="Export options for downloading your dataset">
+  <img 
+    src="/images/datasets/datasets-export.webp" 
+    alt="Dataset export dialog showing different format options"
+  />
+</Frame>
+
+<Tabs>
+<Tab title="Fine-Tuning (JSONL)">
+  Perfect for OpenAI fine-tuning format:
+  
+  ```json
+  {"messages": [{"role": "user", "content": "What is quantum computing?"}, {"role": "assistant", "content": "Quantum computing is..."}]}
+  {"messages": [{"role": "user", "content": "Explain machine learning"}, {"role": "assistant", "content": "Machine learning is..."}]}
+  ```
+  
+  Ready to use directly with:
+  - OpenAI's fine-tuning API
+  - Anthropic Claude fine-tuning
+  - Custom training pipelines
+</Tab>
+
+<Tab title="Analysis (CSV)">
+  Structured format for spreadsheet analysis:
+  
+  ```csv
+  request_id,created_at,model,prompt_tokens,completion_tokens,cost,user_message,assistant_response,properties
+  req_123,2024-01-15,gpt-4o,50,100,0.002,"What is AI?","AI is...","{feature: support}"
+  req_124,2024-01-15,gpt-4o-mini,45,95,0.0001,"Help me","I'd be happy to help!","{feature: support}"
+  ```
+  
+  Import into:
+  - Excel or Google Sheets
+  - Python pandas for analysis
+  - Data visualization tools
+  - Research databases
+</Tab>
+</Tabs>
+
+### Programmatic Export
+
+Retrieve dataset contents via API:
+
+```python
+import requests
+import json
+
+# Query dataset rows
+response = requests.post(
+    f"https://api.helicone.ai/v1/helicone-dataset/{dataset_id}/query",
+    headers={"Authorization": f"Bearer {HELICONE_API_KEY}"},
+    json={"limit": 1000, "offset": 0}
+)
+
+rows = response.json()
+
+# Format for fine-tuning
+training_data = []
+for row in rows:
+    # Fetch full request/response from signed URL
+    data = requests.get(row['signed_url']).json()
+    training_data.append({
+        "messages": data['request']['messages']
+    })
+
+# Save as JSONL
+with open('training_data.jsonl', 'w') as f:
+    for item in training_data:
+        f.write(json.dumps(item) + '\n')
+```
+
+## Use Cases
+
+### Replace Expensive Models with Fine-Tuned Alternatives
+
+The most common use case—train cheaper models on expensive model outputs:
+
+<Steps>
+<Step title="Log premium model outputs">
+  Start logging successful requests from GPT-4, Claude Sonnet, or other expensive models
+  
+  ```typescript
+  const response = await openai.chat.completions.create(
+    { model: "gpt-4o", messages },
+    {
+      headers: {
+        "Helicone-Property-Task": "customer-support",
+        "Helicone-Property-Quality": "production"
+      }
+    }
+  );
+  ```
+</Step>
+
+<Step title="Build task-specific datasets">
+  Create separate datasets for different tasks:
+  - Customer support responses
+  - Code generation
+  - Data extraction
+  - Content summarization
+</Step>
+
+<Step title="Curate for consistency">
+  Review examples to ensure responses follow the same format, style, and quality standards
+</Step>
+
+<Step title="Fine-tune smaller models">
+  Export JSONL and fine-tune models that are 10-50x cheaper:
+  - GPT-4o-mini (10x cheaper than GPT-4o)
+  - Gemini 2.5 Flash (50x cheaper than Gemini Pro)
+  - Claude Haiku (30x cheaper than Claude Sonnet)
+</Step>
+
+<Step title="Iterate with production data">
+  Continue collecting examples from your fine-tuned model to improve it over time
+</Step>
+</Steps>
+
+<Note>
+A fine-tuned GPT-4o-mini can often match or exceed GPT-4o performance on specific tasks while costing 90% less. Start with 50-100 examples and iterate.
+</Note>
+
+### Task-Specific Evaluation Sets
+
+Build test datasets to evaluate model performance consistently:
+
+```typescript
+// Create evaluation datasets for different capabilities
+const evalDatasets = {
+  reasoning: {
+    name: 'Complex Reasoning',
+    description: 'Multi-step problems with verified solutions',
+    requestIds: [] // Add IDs of reasoning examples
+  },
+  extraction: {
+    name: 'Data Extraction',
+    description: 'Structured data extraction with known correct outputs',
+    requestIds: [] // Add IDs of extraction examples
+  },
+  creativity: {
+    name: 'Creative Writing',
+    description: 'Creative writing with human-rated quality scores',
+    requestIds: [] // Add IDs of creative examples
+  }
+};
+
+// Use these to:
+// - Compare model versions before deploying
+// - Test prompt changes against consistent examples
+// - Identify model weaknesses and blind spots
+```
+
+### Continuous Improvement Pipeline
+
+<Frame caption="Use scores and user feedback to identify your best examples">
+  <img 
+    src="/images/datasets/scores.webp" 
+    alt="Filtering requests by scores to identify best examples for datasets"
+  />
+</Frame>
+
+Build a data flywheel for model improvement:
+
+1. **Tag production requests** with custom properties for filtering
+   ```typescript
+   { headers: { "Helicone-Property-Feature": "chat" } }
+   ```
+
+2. **Score outputs** based on automated metrics or user feedback
+   ```typescript
+   await fetch(`/v1/request/${id}/score`, {
+     body: JSON.stringify({ scores: { quality: 95 } })
+   });
+   ```
+
+3. **Filter high-quality examples** using scores and feedback
+   ```sql
+   -- In Helicone dashboard filters
+   scores.quality > 90 AND feedback = true
+   ```
+
+4. **Auto-add to datasets** when examples meet quality thresholds
+
+5. **Regular retraining** with newly curated examples every week/month
+
+6. **A/B test** new models against production traffic before full rollout
+
+### Research and Compliance
+
+Export datasets for research, auditing, or compliance:
+
+```python
+# Export dataset with metadata for research
+import pandas as pd
+
+rows = query_dataset(dataset_id)
+df = pd.DataFrame(rows)
+
+# Add analysis columns
+df['response_length'] = df['assistant_response'].str.len()
+df['prompt_complexity'] = df['user_message'].apply(calculate_complexity)
+df['contains_code'] = df['assistant_response'].str.contains('```')
+
+# Export for analysis
+df.to_csv('research_dataset.csv', index=False)
+
+# Generate statistics
+stats = df.groupby('model').agg({
+    'cost': 'sum',
+    'prompt_tokens': 'mean',
+    'completion_tokens': 'mean'
+})
+print(stats)
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+<Card title="Quality over Quantity" icon="star">
+  Choose fewer, high-quality examples rather than large datasets with mixed quality
+</Card>
+
+<Card title="Task-Specific Datasets" icon="bullseye">
+  Create separate datasets for different use cases rather than one general dataset
+</Card>
+
+<Card title="Regular Updates" icon="arrows-rotate">
+  Continuously add new examples as your application evolves and improves
+</Card>
+
+<Card title="Clear Criteria" icon="list-check">
+  Document what makes a "good" example for each dataset's specific purpose
+</Card>
+
+<Card title="Version Control" icon="code-branch">
+  Create new dataset versions when making significant changes to examples
+</Card>
+
+<Card title="Diverse Examples" icon="shuffle">
+  Include varied inputs, edge cases, and different user types in your datasets
+</Card>
+</CardGroup>
+
+## API Reference
+
+### Key Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/helicone-dataset` | POST | Create new dataset with requests |
+| `/v1/helicone-dataset/query` | POST | List all datasets |
+| `/v1/helicone-dataset/{id}/query` | POST | Get dataset rows |
+| `/v1/helicone-dataset/{id}/mutate` | POST | Add/remove requests |
+| `/v1/helicone-dataset/{id}/request/{requestId}` | POST | Update request data |
+| `/v1/helicone-dataset/{id}/delete` | POST | Delete dataset |
+
+[View full API documentation →](/rest/dataset/post-v1helicone-dataset)
+
+## Related Features
+
+<CardGroup cols={2}>
+<Card title="Scores" icon="star" href="/evaluation/scores">
+  Track evaluation metrics to identify best examples for datasets
+</Card>
+
+<Card title="Feedback" icon="comment" href="/evaluation/feedback">
+  Use user ratings to find high-quality examples automatically
+</Card>
+
+<Card title="Custom Properties" icon="tag" href="/features/advanced-usage/custom-properties">
+  Tag requests to make dataset creation easier with filtering
+</Card>
+
+<Card title="Sessions" icon="link" href="/features/sessions">
+  Include full conversation context in your datasets
+</Card>
+</CardGroup>
+
+---
+
+Datasets turn your production LLM logs into valuable training and evaluation resources. Start small with a focused use case, then expand as you see the benefits of curated, high-quality data.

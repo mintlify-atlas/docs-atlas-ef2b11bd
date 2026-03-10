@@ -1,0 +1,510 @@
+---
+title: "Debugging LLM Applications"
+description: "Identify errors, diagnose issues, and optimize LLM application performance with Helicone's debugging tools"
+sidebarTitle: "Debugging"
+---
+
+Debugging LLM applications is different from traditional software debugging. Issues can be subtle - wrong responses, inconsistent behavior, or silent failures that only affect quality, not functionality.
+
+Helicone provides comprehensive debugging tools to identify, diagnose, and resolve issues in your LLM applications.
+
+## Common LLM Issues
+
+<CardGroup cols={2}>
+  <Card title="Errors & Timeouts" icon="triangle-exclamation">
+    API failures, rate limits, timeouts, and provider outages
+  </Card>
+  <Card title="Quality Issues" icon="message-question">
+    Wrong answers, inconsistent outputs, hallucinations, and context loss
+  </Card>
+  <Card title="Performance Problems" icon="gauge-high">
+    Slow responses, high latency, and token inefficiency
+  </Card>
+  <Card title="Cost Overruns" icon="dollar-sign">
+    Unexpected spending, inefficient prompts, and model selection
+  </Card>
+</CardGroup>
+
+## Debugging Workflow
+
+<Steps>
+  <Step title="Filter by Status Codes">
+    Start by identifying failed requests using status code filters:
+
+    <Frame caption="Filter requests by status code to identify errors">
+      <img
+        src="/images/use-cases/status-filter.png"
+        alt="Helicone request page showing status code filter for error identification"
+      />
+    </Frame>
+
+    Common status codes:
+    - **200** - Success
+    - **400** - Bad request (malformed input)
+    - **401** - Authentication failed
+    - **429** - Rate limit exceeded
+    - **500** - Provider error
+    - **503** - Provider unavailable
+
+    ```typescript
+    // Add request IDs for easier debugging
+    const requestId = `req-${Date.now()}`;
+    
+    const response = await client.chat.completions.create(
+      {
+        model: "gpt-4o",
+        messages: [...],
+      },
+      {
+        headers: {
+          "Helicone-Request-Id": requestId,
+          "Helicone-Property-Feature": "document-processing",
+        },
+      }
+    );
+    ```
+  </Step>
+
+  <Step title="Inspect Request Details">
+    Click on any request to see complete details:
+
+    <Frame caption="Detailed request view showing input, output, and metadata">
+      <img
+        src="/images/use-cases/view-request.png"
+        alt="Helicone request detail page with full request and response data"
+      />
+    </Frame>
+
+    Key information available:
+    - **Full request body** - Exact prompt and parameters sent
+    - **Complete response** - What the model returned
+    - **Timing breakdown** - Where latency occurred
+    - **Token usage** - Input/output token counts
+    - **Cost** - Exact cost of this request
+    - **Custom properties** - Your metadata for filtering
+  </Step>
+
+  <Step title="Use Playground for Testing">
+    Test fixes immediately without redeploying code:
+
+    <Frame caption="Playground for testing prompt modifications">
+      <img
+        src="/images/use-cases/playground-button.png"
+        alt="Playground button on request detail page"
+      />
+    </Frame>
+
+    The Playground allows you to:
+    - Modify the prompt and see new results
+    - Change model parameters (temperature, max tokens)
+    - Switch models to compare outputs
+    - Test different approaches quickly
+
+    <Frame caption="Interactive playground for prompt testing">
+      <img
+        src="/images/use-cases/playground.png"
+        alt="Helicone playground interface for testing prompts"
+      />
+    </Frame>
+
+    <Info>Currently, only OpenAI models are supported in the Playground</Info>
+  </Step>
+
+  <Step title="Track Sessions for Context">
+    Debug issues in multi-turn conversations by viewing complete sessions:
+
+    ```typescript
+    const sessionId = `session-${userId}-${Date.now()}`;
+
+    // First request in conversation
+    await client.chat.completions.create(
+      {
+        model: "gpt-4o",
+        messages: [{ role: "user", content: "Hello" }],
+      },
+      {
+        headers: {
+          "Helicone-Session-Id": sessionId,
+          "Helicone-Session-Name": "Customer Chat",
+          "Helicone-Session-Path": "/greeting",
+        },
+      }
+    );
+
+    // Follow-up request (same session)
+    await client.chat.completions.create(
+      {
+        model: "gpt-4o",
+        messages: conversationHistory,
+      },
+      {
+        headers: {
+          "Helicone-Session-Id": sessionId,
+          "Helicone-Session-Path": "/follow-up",
+        },
+      }
+    );
+    ```
+
+    Sessions help you:
+    - See the full conversation context
+    - Identify where context was lost
+    - Track how costs accumulate
+    - Understand user interaction patterns
+  </Step>
+</Steps>
+
+## Debugging Specific Issues
+
+### API Errors & Rate Limits
+
+When you see 429 or 500 errors:
+
+<Tabs>
+  <Tab title="Implement Retries">
+    ```typescript
+    async function makeRequestWithRetry(
+      client: OpenAI,
+      params: any,
+      maxRetries = 3
+    ) {
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          return await client.chat.completions.create(
+            params,
+            {
+              headers: {
+                "Helicone-Property-Retry-Attempt": String(i),
+              },
+            }
+          );
+        } catch (error: any) {
+          if (error?.status === 429 && i < maxRetries - 1) {
+            // Exponential backoff
+            const delay = Math.pow(2, i) * 1000;
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+          throw error;
+        }
+      }
+    }
+    ```
+  </Tab>
+
+  <Tab title="Add Rate Limiting">
+    ```typescript
+    // Prevent rate limit errors
+    headers: {
+      "Helicone-RateLimit-Policy": "100;w=60;s=user", // 100 per minute per user
+    }
+    ```
+  </Tab>
+
+  <Tab title="Use Fallback Providers">
+    ```typescript
+    import { createGateway } from "@ai-sdk/gateway";
+
+    const gateway = createGateway({
+      apiKey: process.env.GATEWAY_API_KEY,
+      baseURL: "https://gateway.helicone.ai/v1",
+    });
+
+    // Automatically falls back if primary provider fails
+    const response = await gateway.chat.completions.create({
+      model: "gpt-4o",
+      messages: [...],
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### Quality Issues
+
+When responses are wrong or inconsistent:
+
+<AccordionGroup>
+  <Accordion title="Compare Across Sessions" icon="chart-line">
+    Filter requests by custom properties to identify patterns:
+
+    ```typescript
+    headers: {
+      "Helicone-Property-Query-Type": "technical-support",
+      "Helicone-Property-User-Type": "premium",
+    }
+    ```
+
+    Then filter in the dashboard to see:
+    - Do technical queries fail more often?
+    - Are premium users having different issues?
+    - Which features have the most quality problems?
+  </Accordion>
+
+  <Accordion title="Track Model Versions" icon="code-branch">
+    Tag requests with model versions to compare quality:
+
+    ```python
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=messages,
+        extra_headers={
+            "Helicone-Property-Prompt-Version": "v2.1",
+            "Helicone-Property-System-Prompt": "technical-assistant"
+        }
+    )
+    ```
+
+    This helps you:
+    - A/B test prompt changes
+    - Track quality regressions
+    - Identify which version works best
+  </Accordion>
+
+  <Accordion title="Use Score Tracking" icon="star">
+    Add quality scores to track improvements:
+
+    ```typescript
+    // After getting user feedback
+    await fetch(`https://api.helicone.ai/v1/request/${requestId}/score`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${HELICONE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        scores: {
+          "user-satisfaction": 5,
+          "accuracy": 0.9,
+          "helpfulness": 4,
+        },
+      }),
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Performance Problems
+
+When responses are slow:
+
+<Tabs>
+  <Tab title="Analyze Latency">
+    Check the request details for timing breakdown:
+    - **Queue time** - How long before processing started
+    - **Processing time** - Model inference time
+    - **Network time** - Transfer latency
+
+    ```typescript
+    // Add timing metadata
+    const startTime = Date.now();
+    
+    const response = await client.chat.completions.create(
+      params,
+      {
+        headers: {
+          "Helicone-Property-Client-Start-Time": String(startTime),
+        },
+      }
+    );
+    
+    const endTime = Date.now();
+    console.log(`Total latency: ${endTime - startTime}ms`);
+    ```
+  </Tab>
+
+  <Tab title="Optimize Token Usage">
+    Review token counts in request details:
+
+    ```typescript
+    // Reduce max tokens for faster responses
+    const response = await client.chat.completions.create(
+      {
+        model: "gpt-4o",
+        messages: [...],
+        max_tokens: 500, // Limit output length
+      },
+      {
+        headers: {
+          "Helicone-Property-Max-Tokens": "500",
+        },
+      }
+    );
+    ```
+  </Tab>
+
+  <Tab title="Use Faster Models">
+    Switch to faster models for simple queries:
+
+    ```typescript
+    function selectModel(complexity: string) {
+      switch (complexity) {
+        case "simple":
+          return "gpt-4o-mini"; // Much faster
+        case "complex":
+          return "gpt-4o";
+        default:
+          return "gpt-4o-mini";
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Cost Overruns
+
+When costs are higher than expected:
+
+```typescript
+// Add cost tracking properties
+headers: {
+  "Helicone-Property-Feature": "document-analysis",
+  "Helicone-Property-Document-Length": String(docLength),
+  "Helicone-Session-Id": sessionId,
+}
+```
+
+Then analyze in the dashboard:
+1. **Filter by feature** to find expensive operations
+2. **Check session costs** to see complete workflows
+3. **Review token usage** to identify inefficient prompts
+4. **Compare model costs** to find cheaper alternatives
+
+See the [Cost Tracking guide](/guides/cost-tracking) for detailed optimization strategies.
+
+## Advanced Debugging Techniques
+
+### Custom Request IDs
+
+Use predictable IDs to correlate with your own logs:
+
+```typescript
+const requestId = `${userId}-${feature}-${timestamp}`;
+
+headers: {
+  "Helicone-Request-Id": requestId,
+}
+```
+
+Then search for this ID in both Helicone and your application logs.
+
+### Property-Based Filtering
+
+Tag requests with rich metadata for powerful filtering:
+
+```python
+response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=messages,
+    extra_headers={
+        "Helicone-Property-Environment": os.getenv("ENV"),
+        "Helicone-Property-User-Tier": user.tier,
+        "Helicone-Property-Feature": "search",
+        "Helicone-Property-Version": "v2.3",
+        "Helicone-Property-AB-Test": "prompt-variant-B",
+    }
+)
+```
+
+Filter combinations like:
+- "Show me production errors for premium users"
+- "Compare v2.3 vs v2.2 response times"
+- "Which A/B test variant has better quality?"
+
+### Session Replay
+
+Replay entire sessions to reproduce issues:
+
+1. Find the problematic session in the dashboard
+2. Click **"Replay Session"**
+3. View the exact sequence of requests
+4. Test fixes against the same inputs
+
+<Info>
+Session replay is especially useful for debugging multi-turn conversations where context matters.
+</Info>
+
+## Debugging Checklist
+
+When investigating an issue:
+
+- [ ] Check status codes for obvious errors
+- [ ] Review request/response in detail
+- [ ] Test fixes in Playground
+- [ ] Look at session context if multi-turn
+- [ ] Filter by custom properties to find patterns
+- [ ] Compare with working requests
+- [ ] Check timing breakdown for performance
+- [ ] Review token usage for cost issues
+- [ ] Add more logging for future debugging
+
+## Proactive Debugging
+
+Prevent issues before they happen:
+
+### Set Up Alerts
+
+```typescript
+// Configure in Helicone dashboard:
+// 1. Error rate > 5%
+// 2. Average latency > 2 seconds
+// 3. Daily cost > $100
+// 4. Any 500 errors
+```
+
+### Add Comprehensive Logging
+
+```typescript
+function makeTrackedRequest(feature: string, userId: string, params: any) {
+  return client.chat.completions.create(
+    params,
+    {
+      headers: {
+        "Helicone-Session-Id": `${userId}-${Date.now()}`,
+        "Helicone-Property-Feature": feature,
+        "Helicone-Property-Environment": process.env.NODE_ENV,
+        "Helicone-Property-Version": APP_VERSION,
+        "Helicone-User-Id": userId,
+      },
+    }
+  );
+}
+```
+
+### Monitor Key Metrics
+
+Track these metrics weekly:
+- **Error rate** - Should stay below 2%
+- **P95 latency** - Should be under 3 seconds
+- **Average cost per session** - Watch for increases
+- **Cache hit rate** - Should be above 50% for cacheable content
+
+## Debugging Tools Reference
+
+<CardGroup cols={2}>
+  <Card title="Request Filters" icon="filter" href="/features/advanced-usage/filters">
+    Filter by status, model, properties, and more
+  </Card>
+  <Card title="Sessions" icon="layer-group" href="/features/sessions">
+    Track multi-turn conversations and workflows
+  </Card>
+  <Card title="Custom Properties" icon="tags" href="/features/advanced-usage/custom-properties">
+    Add metadata for powerful filtering
+  </Card>
+  <Card title="Alerts" icon="bell" href="/features/alerts">
+    Get notified of issues immediately
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Agent Tracing" icon="diagram-project" href="/guides/agent-tracing">
+    Debug complex agent workflows with tool calls
+  </Card>
+  <Card title="Cost Tracking" icon="dollar-sign" href="/guides/cost-tracking">
+    Identify and optimize expensive operations
+  </Card>
+  <Card title="Experiments" icon="flask" href="/guides/experiments">
+    A/B test fixes before deploying to production
+  </Card>
+</CardGroup>

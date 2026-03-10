@@ -1,0 +1,436 @@
+---
+title: "Cost Tracking & Optimization"
+description: "Monitor LLM spending, optimize costs across providers, and understand unit economics for your AI applications"
+sidebarTitle: "Cost Tracking"
+---
+
+Track and optimize your LLM costs across all providers. Helicone provides detailed cost analytics and optimization tools to help you manage your AI budget effectively.
+
+## How We Calculate Costs
+
+Helicone uses two systems for cost calculation depending on your integration method:
+
+### AI Gateway (100% Accurate)
+
+When using Helicone's AI Gateway, we have complete visibility into model usage and calculate costs precisely using our [Model Registry v2](https://helicone.ai/models) system.
+
+### Best Effort (Without Gateway)
+
+For direct provider integrations, we use our open-source cost repository with pricing for 300+ models. This provides best-effort cost estimates based on model detection and token counts.
+
+<Note>
+**Cost not showing?** If your model costs aren't supported, [join our Discord](https://discord.com/invite/HwUbV3Q8qz) or email [help@helicone.ai](mailto:help@helicone.ai) and we'll add support quickly.
+</Note>
+
+## Understanding Unit Economics
+
+The most critical aspect of cost tracking is understanding your unit economics - what drives costs in your application and how to optimize them.
+
+<Frame caption="Session cost breakdown showing unit economics across different user interactions">
+  <img
+    src="/images/sessions/session-metrics.webp"
+    alt="Helicone dashboard showing session-level cost breakdown with request counts and average costs per session type"
+  />
+</Frame>
+
+### Sessions: Your Cost Foundation
+
+[Sessions](/features/sessions) group related requests to show the true cost of user interactions. Instead of seeing individual API calls, you see complete workflows:
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { OpenAI } from "openai";
+
+    const client = new OpenAI({
+      baseURL: "https://oai.helicone.ai/v1",
+      apiKey: process.env.OPENAI_API_KEY,
+      defaultHeaders: {
+        "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+      },
+    });
+
+    // Track a complete customer support interaction
+    const response = await client.chat.completions.create(
+      { 
+        model: "gpt-4o", 
+        messages: [...] 
+      },
+      {
+        headers: {
+          "Helicone-Session-Id": "support-ticket-123",
+          "Helicone-Session-Name": "Customer Support",
+          "Helicone-Property-TicketType": "password-reset"
+        }
+      }
+    );
+    ```
+  </Tab>
+
+  <Tab title="Python">
+    ```python
+    from openai import OpenAI
+
+    client = OpenAI(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        base_url="https://oai.helicone.ai/v1",
+        default_headers={
+            "Helicone-Auth": f"Bearer {os.getenv('HELICONE_API_KEY')}"
+        }
+    )
+
+    # Track a complete customer support interaction
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[...],
+        extra_headers={
+            "Helicone-Session-Id": "support-ticket-123",
+            "Helicone-Session-Name": "Customer Support",
+            "Helicone-Property-TicketType": "password-reset"
+        }
+    )
+    ```
+  </Tab>
+</Tabs>
+
+This reveals insights like:
+- A support chat costs $0.12 on average with 5 API calls
+- Document analysis workflows cost $0.45 with 12 API calls
+- Quick queries cost $0.02 with a single call
+
+### Segmentation That Matters
+
+Use [custom properties](/features/advanced-usage/custom-properties) to slice costs by the dimensions that matter to your business:
+
+<Frame caption="Cost breakdown by user tier showing premium users generate 3x more value than cost">
+  <img
+    src="/images/custom-properties/properties-page.webp"
+    alt="Dashboard showing cost segmentation by user tiers with ROI analysis"
+  />
+</Frame>
+
+```typescript
+headers: {
+  "Helicone-Property-UserTier": "premium",
+  "Helicone-Property-Feature": "document-analysis",
+  "Helicone-Property-Environment": "production",
+  "Helicone-Property-Region": "us-east-1"
+}
+```
+
+Now you can answer questions like:
+- Do premium users justify their higher usage costs?
+- Which features are cost-efficient vs. cost-intensive?
+- How much are we spending on development vs. production?
+- Which regions have the highest per-user costs?
+
+## Practical Cost Analysis
+
+<Steps>
+  <Step title="Track Baseline Costs">
+    Start by understanding your current spending patterns:
+
+    ```typescript
+    // Add environment tracking to all requests
+    const client = new OpenAI({
+      baseURL: "https://oai.helicone.ai/v1",
+      apiKey: process.env.OPENAI_API_KEY,
+      defaultHeaders: {
+        "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+        "Helicone-Property-Environment": process.env.NODE_ENV,
+      },
+    });
+    ```
+
+    After a week, review your dashboard to identify:
+    - Daily average costs
+    - Cost per user/session
+    - Most expensive features
+    - Peak usage times
+  </Step>
+
+  <Step title="Identify Cost Drivers">
+    Use custom properties to pinpoint expensive operations:
+
+    ```python
+    # Tag expensive document processing
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=messages,
+        extra_headers={
+            "Helicone-Property-Operation": "document-processing",
+            "Helicone-Property-DocumentSize": str(len(document)),
+            "Helicone-Property-PageCount": str(page_count)
+        }
+    )
+    ```
+
+    Filter by properties in your dashboard to see:
+    - Which document sizes cost the most
+    - If long documents justify their cost
+    - Where to optimize token usage
+  </Step>
+
+  <Step title="Implement Cost Controls">
+    Set up [rate limits](/features/advanced-usage/rate-limiting) and [alerts](/features/alerts):
+
+    ```typescript
+    headers: {
+      // Limit to 100 requests per user per day
+      "Helicone-RateLimit-Policy": "100;w=86400;s=user",
+      
+      // Track costs by user for alerts
+      "Helicone-User-Id": userId,
+    }
+    ```
+
+    Configure alerts in the Helicone dashboard:
+    - Daily spending threshold: $100
+    - User spending threshold: $10/day
+    - Error rate threshold: 5%
+  </Step>
+
+  <Step title="Optimize with Caching">
+    Enable [caching](/features/advanced-usage/caching) for repetitive queries:
+
+    ```typescript
+    // Cache FAQ responses for 1 hour
+    headers: {
+      "Helicone-Cache-Enabled": "true",
+      "Helicone-Cache-Bucket-Max-Size": "100",
+      "Helicone-Cache-Seed": "faq-v1",
+    }
+    ```
+
+    Best caching candidates:
+    - FAQ responses (90%+ savings)
+    - Product descriptions (85% savings)
+    - Static content generation (80% savings)
+    - Development/testing environments (95% savings)
+  </Step>
+</Steps>
+
+## AI Gateway Cost Optimization
+
+The [AI Gateway](/gateway/overview) doesn't just track costs - it actively optimizes them through intelligent routing.
+
+### Automatic Model Selection
+
+The [Model Registry](https://helicone.ai/models) shows all supported models with real-time pricing across providers. The AI Gateway automatically routes to the cheapest option:
+
+<Frame caption="Model Registry showing price comparison across providers">
+  <img
+    src="/images/model-selection.webp"
+    alt="Helicone Model Registry interface showing models sorted by price across different providers"
+  />
+</Frame>
+
+### How Automatic Optimization Works
+
+1. **[BYOK Priority](/gateway/provider-routing#option-2-your-own-keys-byok)** - Uses your existing credits first (AWS, Azure, etc.)
+2. **[Cost-Based Routing](/gateway/provider-routing#smart-routing-algorithm)** - Automatically selects the cheapest available provider
+3. **[Smart Fallbacks](/gateway/provider-routing#failover-triggers)** - If one provider fails, routes to the next cheapest option
+
+```typescript
+import { createGateway } from "@ai-sdk/gateway";
+
+const gateway = createGateway({
+  apiKey: process.env.GATEWAY_API_KEY,
+  baseURL: "https://gateway.helicone.ai/v1",
+  headers: {
+    "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+  },
+});
+
+// One request, multiple potential providers
+await gateway.chat.completions.create({
+  model: "claude-3.5-sonnet",
+  messages: [...]
+});
+
+// Gateway automatically routes to cheapest available:
+// 1. Your AWS Bedrock key ($3/1M tokens)
+// 2. Your Anthropic key ($3/1M tokens)  
+// 3. Next cheapest provider...
+```
+
+### Cost-Based Model Selection
+
+Route to different models based on query complexity:
+
+```typescript
+function selectModel(complexity: string) {
+  switch (complexity) {
+    case "simple":
+      return "gpt-4o-mini"; // $0.15/1M input tokens
+    case "complex":
+      return "gpt-4o"; // $2.50/1M input tokens
+    case "technical":
+      return "claude-3.5-sonnet"; // $3.00/1M input tokens
+  }
+}
+
+const response = await client.chat.completions.create(
+  {
+    model: selectModel(queryComplexity),
+    messages: [...],
+  },
+  {
+    headers: {
+      "Helicone-Property-Complexity": queryComplexity,
+    },
+  }
+);
+```
+
+## Cost Prevention & Alerts
+
+<Frame caption="Cost alert configuration with spending thresholds and real-time notifications">
+  <img
+    src="/images/alerts/alert-triggered.webp"
+    alt="Alert configuration interface showing daily and monthly spending limits"
+  />
+</Frame>
+
+### Setting Smart Alerts
+
+Configure [cost alerts](/features/alerts) to catch spending issues before they become problems:
+
+1. **Graduated thresholds** - Alert at 50%, 80%, 95% of budget
+2. **Environment-specific limits** - Higher for production, lower for dev
+3. **User-level alerts** - Track individual user spending
+4. **Feature-level alerts** - Monitor expensive features separately
+
+<Note>
+Cost alerts rely on accurate cost data. See [How We Calculate Costs](#how-we-calculate-costs) above. If you see "cost not supported" for your model, [contact us](https://discord.com/invite/HwUbV3Q8qz) to add support.
+</Note>
+
+### Rate Limiting for Cost Control
+
+Prevent runaway costs with [rate limits](/features/advanced-usage/rate-limiting):
+
+```typescript
+headers: {
+  // Per-user limits
+  "Helicone-RateLimit-Policy": "100;w=86400;s=user", // 100/day
+  
+  // Per-session limits  
+  "Helicone-RateLimit-Policy": "20;w=3600;s=session", // 20/hour
+  
+  // Global limits
+  "Helicone-RateLimit-Policy": "10000;w=86400", // 10k/day
+}
+```
+
+## Analyzing Cost Trends
+
+### Query Session Costs
+
+Retrieve cost data programmatically:
+
+```typescript
+const response = await fetch("https://api.helicone.ai/v1/session/query", {
+  method: "POST",
+  headers: {
+    "Authorization": `Bearer ${HELICONE_API_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    filter: {
+      properties: {
+        "Environment": "production",
+        "UserTier": "premium",
+      },
+    },
+  }),
+});
+
+const sessions = await response.json();
+
+// Calculate cost per user
+const costByUser = sessions.reduce((acc, session) => {
+  acc[session.userId] = (acc[session.userId] || 0) + session.cost;
+  return acc;
+}, {});
+```
+
+### Export for Analysis
+
+Export cost data for deeper analysis:
+
+```bash
+curl -X POST https://api.helicone.ai/v1/request/query \
+  -H "Authorization: Bearer $HELICONE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "request_created_at": {
+        "gte": "2024-01-01T00:00:00Z"
+      }
+    },
+    "limit": 10000
+  }' > costs.json
+```
+
+## Automated Cost Reports
+
+Get regular cost summaries delivered to your inbox or Slack channels.
+
+### What Reports Include
+
+- Weekly spending summaries and trends
+- Model usage breakdown by cost
+- Top cost drivers and expensive requests
+- Week-over-week comparisons
+- Optimization recommendations
+
+### Setting Up Reports
+
+Configure automated reports in **Settings → Reports** to receive them via:
+- **Email** - Weekly digests to any email address
+- **Slack** - Post to your team channels
+
+<Note>
+Reports help you stay on top of costs without checking the dashboard daily. Perfect for finance teams and engineering managers tracking AI spend.
+</Note>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Start with Sessions" icon="layer-group">
+    Always track complete workflows with sessions to understand true unit economics, not just per-request costs.
+  </Accordion>
+
+  <Accordion title="Tag Everything" icon="tags">
+    Use custom properties liberally - you can filter by them later but can't add them retroactively.
+  </Accordion>
+
+  <Accordion title="Set Graduated Alerts" icon="bell">
+    Alert at 50%, 80%, and 95% of budget to give yourself time to respond without alert fatigue.
+  </Accordion>
+
+  <Accordion title="Cache Aggressively in Dev" icon="database">
+    Use 100% caching in development environments to eliminate unnecessary costs during testing.
+  </Accordion>
+
+  <Accordion title="Review Weekly" icon="calendar">
+    Set a recurring calendar event to review cost trends and identify optimization opportunities.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Set Up Alerts" icon="bell" href="/features/alerts">
+    Configure spending thresholds before they become problems
+  </Card>
+  <Card title="Enable Caching" icon="database" href="/features/advanced-usage/caching">
+    Start saving immediately on repetitive requests
+  </Card>
+  <Card title="Configure Gateway" icon="route" href="/gateway/overview">
+    Let automatic routing optimize your costs
+  </Card>
+  <Card title="Track Sessions" icon="layer-group" href="/features/sessions">
+    Understand your true unit economics
+  </Card>
+</CardGroup>

@@ -1,0 +1,171 @@
+---
+title: "Add Session Feedback"
+sidebarTitle: "Add Feedback"
+description: "Submit user feedback ratings for specific sessions"
+openapi: post /v1/session/{sessionId}/feedback
+---
+
+## Overview
+
+The Session Feedback endpoint allows you to capture user ratings for sessions. This is useful for tracking session quality, user satisfaction, and identifying areas for improvement in your AI applications.
+
+## Path Parameters
+
+<ParamField path="sessionId" type="string" required>
+  The unique identifier of the session to add feedback to
+</ParamField>
+
+## Request Body
+
+<ParamField body="rating" type="boolean" required>
+  The feedback rating for the session
+  
+  - `true`: Positive feedback (thumbs up)
+  - `false`: Negative feedback (thumbs down)
+</ParamField>
+
+## Response
+
+<ResponseField name="data" type="null">
+  Returns `null` on success
+</ResponseField>
+
+<ResponseField name="error" type="string | null">
+  Error message if the request failed, `null` otherwise
+</ResponseField>
+
+## Example Request
+
+```bash
+curl -X POST https://api.helicone.ai/v1/session/sess_abc123/feedback \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rating": true
+  }'
+```
+
+## Example Response (Success)
+
+```json
+{
+  "data": null,
+  "error": null
+}
+```
+
+## Example Response (Error)
+
+```json
+{
+  "data": null,
+  "error": "No request found"
+}
+```
+
+## How It Works
+
+When you submit feedback:
+
+1. The system finds the first request in the session (by creation time)
+2. Adds a `Helicone-Session-Feedback` property to that request
+3. The value is stored as "1" for positive feedback or "0" for negative feedback
+
+This allows you to query and filter sessions based on user feedback in your analytics.
+
+## Use Cases
+
+### Collect User Satisfaction
+
+Add thumbs up/down buttons in your application to capture user sentiment:
+
+```javascript
+// After a chat session completes
+async function submitSessionFeedback(sessionId, isPositive) {
+  await fetch(`https://api.helicone.ai/v1/session/${sessionId}/feedback`, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ rating: isPositive })
+  });
+}
+
+// User clicks thumbs up
+submitSessionFeedback('sess_abc123', true);
+```
+
+### Track Session Quality
+
+Combine feedback with session metrics to understand quality:
+
+```javascript
+// Query sessions with positive feedback
+const positiveSessions = await fetch('https://api.helicone.ai/v1/session/query', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    filter: {
+      request_response_rmt: {
+        properties: {
+          'Helicone-Session-Feedback': {
+            equals: '1'
+          }
+        }
+      }
+    },
+    timeFilter: {
+      startTimeUnixMs: Date.now() - 7 * 24 * 60 * 60 * 1000, // Last 7 days
+      endTimeUnixMs: Date.now()
+    },
+    timezoneDifference: 0
+  })
+});
+```
+
+### A/B Testing
+
+Track feedback across different model versions or prompts:
+
+```javascript
+// Compare feedback rates between models
+const gpt4Sessions = await querySessionsWithFeedback({
+  filter: {
+    request_response_rmt: {
+      model: { equals: 'gpt-4' }
+    }
+  }
+});
+
+const gpt35Sessions = await querySessionsWithFeedback({
+  filter: {
+    request_response_rmt: {
+      model: { equals: 'gpt-3.5-turbo' }
+    }
+  }
+});
+```
+
+## Error Handling
+
+Common error scenarios:
+
+- **"No request found"**: The session ID doesn't exist or belongs to a different organization
+- **500 status**: Database error or invalid session ID format
+
+## Best Practices
+
+1. **Immediate feedback**: Collect feedback as soon as a session completes while the experience is fresh
+2. **Optional feedback**: Don't require users to provide feedback - make it optional
+3. **Context**: Consider adding additional context beyond binary ratings using custom properties
+4. **Analytics**: Regularly analyze feedback trends to improve your application
+5. **Follow-up**: For negative feedback, consider prompting users for additional details
+
+## Related Endpoints
+
+- [Query Sessions](/api/sessions/query) - Filter sessions by feedback rating
+- [Query Session Metrics](/api/sessions/metrics) - Analyze sessions with metrics

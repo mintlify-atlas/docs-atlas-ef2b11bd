@@ -1,0 +1,639 @@
+---
+title: "Integrations"
+description: "Use Helicone AI Gateway with your favorite frameworks and tools"
+---
+
+## Overview
+
+Helicone AI Gateway works seamlessly with popular AI frameworks, SDKs, and development tools. Simply change the `baseURL` to start using the gateway with your existing code.
+
+## AI Frameworks
+
+### LangChain
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { ChatOpenAI } from "@langchain/openai";
+
+    const model = new ChatOpenAI({
+      model: "gpt-4o-mini",
+      configuration: {
+        baseURL: "https://ai-gateway.helicone.ai",
+        defaultHeaders: {
+          "Authorization": `Bearer ${process.env.HELICONE_API_KEY}`,
+        },
+      },
+    });
+
+    const response = await model.invoke([
+      { role: "user", content: "Hello!" },
+    ]);
+    ```
+    
+    **With Fallbacks:**
+    ```typescript
+    const model = new ChatOpenAI({
+      model: "gpt-4o/openai,gpt-4o/azure,claude-sonnet-4",
+      configuration: {
+        baseURL: "https://ai-gateway.helicone.ai",
+        defaultHeaders: {
+          "Authorization": `Bearer ${process.env.HELICONE_API_KEY}`,
+        },
+      },
+    });
+    ```
+  </Tab>
+
+  <Tab title="Python">
+    ```python
+    from langchain_openai import ChatOpenAI
+    import os
+
+    model = ChatOpenAI(
+        model="gpt-4o-mini",
+        base_url="https://ai-gateway.helicone.ai",
+        api_key=os.getenv("HELICONE_API_KEY"),
+    )
+
+    response = model.invoke([
+        {"role": "user", "content": "Hello!"}
+    ])
+    ```
+    
+    **With Provider Routing:**
+    ```python
+    model = ChatOpenAI(
+        model="gpt-4o/openai,gpt-4o/azure",
+        base_url="https://ai-gateway.helicone.ai",
+        api_key=os.getenv("HELICONE_API_KEY"),
+    )
+    ```
+  </Tab>
+</Tabs>
+
+### LlamaIndex
+
+```python
+from llama_index.llms.openai import OpenAI
+import os
+
+llm = OpenAI(
+    model="gpt-4o-mini",
+    api_base="https://ai-gateway.helicone.ai",
+    api_key=os.getenv("HELICONE_API_KEY"),
+)
+
+response = llm.complete("Hello!")
+print(response)
+```
+
+### LangGraph
+
+```python
+from langgraph.prebuilt import create_react_agent
+from langchain_openai import ChatOpenAI
+import os
+
+model = ChatOpenAI(
+    model="gpt-4o-mini",
+    base_url="https://ai-gateway.helicone.ai",
+    api_key=os.getenv("HELICONE_API_KEY"),
+)
+
+agent = create_react_agent(model, tools=[])
+
+for chunk in agent.stream({"messages": [("user", "Hello!")]}):
+    print(chunk)
+```
+
+### Vercel AI SDK
+
+```typescript
+import { createOpenAI } from "@ai-sdk/openai";
+import { generateText } from "ai";
+
+const helicone = createOpenAI({
+  baseURL: "https://ai-gateway.helicone.ai",
+  apiKey: process.env.HELICONE_API_KEY,
+});
+
+const { text } = await generateText({
+  model: helicone("gpt-4o-mini"),
+  prompt: "Hello!",
+});
+
+console.log(text);
+```
+
+**With Fallbacks:**
+```typescript
+const { text } = await generateText({
+  model: helicone("gpt-4o/openai,gpt-4o/azure,claude-sonnet-4"),
+  prompt: "Hello!",
+});
+```
+
+### Semantic Kernel
+
+<Tabs>
+  <Tab title="C#">
+    ```csharp
+    using Microsoft.SemanticKernel;
+
+    var builder = Kernel.CreateBuilder()
+        .AddOpenAIChatCompletion(
+            modelId: "gpt-4o-mini",
+            apiKey: Environment.GetEnvironmentVariable("HELICONE_API_KEY"),
+            endpoint: new Uri("https://ai-gateway.helicone.ai")
+        );
+
+    var kernel = builder.Build();
+    var response = await kernel.InvokePromptAsync("Hello!");
+    Console.WriteLine(response);
+    ```
+  </Tab>
+
+  <Tab title="Python">
+    ```python
+    from semantic_kernel import Kernel
+    from semantic_kernel.connectors.ai.open_ai import OpenAIChatCompletion
+    import os
+
+    kernel = Kernel()
+    
+    service = OpenAIChatCompletion(
+        ai_model_id="gpt-4o-mini",
+        api_key=os.getenv("HELICONE_API_KEY"),
+        endpoint="https://ai-gateway.helicone.ai",
+    )
+    
+    kernel.add_service(service)
+    
+    response = await kernel.invoke_prompt("Hello!")
+    print(response)
+    ```
+  </Tab>
+</Tabs>
+
+### CrewAI
+
+```python
+from crewai import Agent, Task, Crew
+import os
+
+os.environ["OPENAI_API_BASE"] = "https://ai-gateway.helicone.ai"
+os.environ["OPENAI_API_KEY"] = os.getenv("HELICONE_API_KEY")
+
+agent = Agent(
+    role="Research Assistant",
+    goal="Provide helpful information",
+    backstory="You are a helpful assistant",
+    llm="gpt-4o-mini",
+)
+
+task = Task(
+    description="Say hello",
+    agent=agent,
+)
+
+crew = Crew(agents=[agent], tasks=[task])
+result = crew.kickoff()
+print(result)
+```
+
+## Native SDKs
+
+### OpenAI SDK
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import OpenAI from "openai";
+
+    const client = new OpenAI({
+      baseURL: "https://ai-gateway.helicone.ai",
+      apiKey: process.env.HELICONE_API_KEY,
+    });
+
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: "Hello!" }],
+    });
+    ```
+  </Tab>
+
+  <Tab title="Python">
+    ```python
+    from openai import OpenAI
+    import os
+
+    client = OpenAI(
+        base_url="https://ai-gateway.helicone.ai",
+        api_key=os.getenv("HELICONE_API_KEY"),
+    )
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": "Hello!"}],
+    )
+    ```
+  </Tab>
+</Tabs>
+
+### Anthropic SDK
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import Anthropic from "@anthropic-ai/sdk";
+
+    const client = new Anthropic({
+      apiKey: `Bearer ${process.env.HELICONE_API_KEY}`,
+      baseURL: "https://ai-gateway.helicone.ai",
+      defaultHeaders: {
+        "Helicone-Gateway-Body-Mapping": "NO_MAPPING",
+      },
+    });
+
+    const response = await client.messages.create({
+      model: "claude-3-7-sonnet-20250219/anthropic",
+      max_tokens: 100,
+      messages: [{ role: "user", content: "Hello!" }],
+    });
+    ```
+  </Tab>
+
+  <Tab title="Python">
+    ```python
+    from anthropic import Anthropic
+    import os
+
+    client = Anthropic(
+        api_key=f"Bearer {os.getenv('HELICONE_API_KEY')}",
+        base_url="https://ai-gateway.helicone.ai",
+        default_headers={
+            "Helicone-Gateway-Body-Mapping": "NO_MAPPING",
+        },
+    )
+
+    response = client.messages.create(
+        model="claude-3-7-sonnet-20250219/anthropic",
+        max_tokens=100,
+        messages=[{"role": "user", "content": "Hello!"}],
+    )
+    ```
+  </Tab>
+</Tabs>
+
+### Google Generative AI
+
+```typescript
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+const genAI = new GoogleGenerativeAI(process.env.HELICONE_API_KEY);
+
+const model = genAI.getGenerativeModel(
+  { model: "gemini-2.0-flash" },
+  {
+    baseUrl: "https://ai-gateway.helicone.ai/v1beta",
+  }
+);
+
+const result = await model.generateContent("Hello!");
+console.log(result.response.text());
+```
+
+## Development Tools
+
+### Open WebUI
+
+Configure Open WebUI to use Helicone AI Gateway:
+
+```yaml
+# docker-compose.yml
+services:
+  open-webui:
+    environment:
+      - OPENAI_API_BASE_URL=https://ai-gateway.helicone.ai
+      - OPENAI_API_KEY=${HELICONE_API_KEY}
+```
+
+### Dify
+
+Configure Dify to use Helicone:
+
+1. Go to Settings → Model Provider
+2. Add OpenAI provider:
+   - API Endpoint: `https://ai-gateway.helicone.ai`
+   - API Key: Your Helicone API key
+3. Select models to use
+
+### Cursor IDE
+
+Configure Cursor to use Helicone AI Gateway:
+
+1. Open Cursor Settings
+2. Navigate to Features → AI
+3. Set:
+   - API Base URL: `https://ai-gateway.helicone.ai`
+   - API Key: Your Helicone API key
+
+## Analytics & Monitoring
+
+### PostHog
+
+Export Helicone data to PostHog for custom dashboards:
+
+```typescript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  baseURL: "https://ai-gateway.helicone.ai",
+  apiKey: process.env.HELICONE_API_KEY,
+});
+
+// All requests automatically tracked in Helicone
+// Export to PostHog via Helicone API
+```
+
+See [PostHog Integration](https://docs.helicone.ai/getting-started/integration-method/posthog) for details.
+
+### Custom Analytics
+
+Query Helicone data via API:
+
+```typescript
+import { HeliconeAPIClient } from "@helicone/helicone";
+
+const helicone = new HeliconeAPIClient({
+  apiKey: process.env.HELICONE_API_KEY,
+});
+
+const requests = await helicone.getRequests({
+  filter: {
+    request_created_at: {
+      gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    },
+  },
+});
+
+console.log(`Total requests: ${requests.length}`);
+```
+
+## Testing & Evaluation
+
+### RAGAS
+
+Evaluate RAG pipelines with Helicone tracking:
+
+```python
+from ragas import evaluate
+from langchain_openai import ChatOpenAI
+import os
+
+llm = ChatOpenAI(
+    model="gpt-4o",
+    base_url="https://ai-gateway.helicone.ai",
+    api_key=os.getenv("HELICONE_API_KEY"),
+)
+
+result = evaluate(
+    dataset=my_dataset,
+    llm=llm,
+    metrics=["faithfulness", "answer_relevancy"],
+)
+
+print(result)
+```
+
+All evaluation requests are tracked in Helicone.
+
+## HTTP Clients
+
+### cURL
+
+```bash
+curl https://ai-gateway.helicone.ai/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $HELICONE_API_KEY" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+```
+
+### Axios (TypeScript)
+
+```typescript
+import axios from "axios";
+
+const response = await axios.post(
+  "https://ai-gateway.helicone.ai/v1/chat/completions",
+  {
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Hello!" }],
+  },
+  {
+    headers: {
+      "Authorization": `Bearer ${process.env.HELICONE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+  }
+);
+
+console.log(response.data.choices[0].message.content);
+```
+
+### Requests (Python)
+
+```python
+import requests
+import os
+
+response = requests.post(
+    "https://ai-gateway.helicone.ai/v1/chat/completions",
+    json={
+        "model": "gpt-4o-mini",
+        "messages": [{"role": "user", "content": "Hello!"}],
+    },
+    headers={
+        "Authorization": f"Bearer {os.getenv('HELICONE_API_KEY')}",
+        "Content-Type": "application/json",
+    },
+)
+
+print(response.json()["choices"][0]["message"]["content"])
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Environment Variables" icon="lock">
+    Always store API keys in environment variables:
+    
+    ```bash
+    # .env
+    HELICONE_API_KEY=sk-helicone-xxx
+    ```
+    
+    Never commit API keys to version control.
+  </Accordion>
+
+  <Accordion title="Configure Fallbacks" icon="shield">
+    Add fallbacks for production reliability:
+    
+    ```typescript
+    model: "gpt-4o/openai,gpt-4o/azure,claude-sonnet-4"
+    ```
+  </Accordion>
+
+  <Accordion title="Monitor Usage" icon="chart-line">
+    Track usage in the [Helicone dashboard](https://helicone.ai/dashboard):
+    - Request volume
+    - Cost by provider
+    - Error rates
+    - Latency metrics
+  </Accordion>
+
+  <Accordion title="Use BYOK for Cost Control" icon="key">
+    Configure provider keys for:
+    - Direct provider billing
+    - Better cost control
+    - Priority routing
+    
+    Add keys at [Settings → API Keys](https://helicone.ai/settings/keys)
+  </Accordion>
+</AccordionGroup>
+
+## Framework-Specific Features
+
+### Streaming Support
+
+All frameworks support streaming:
+
+```typescript
+// OpenAI SDK
+const stream = await client.chat.completions.create({
+  model: "gpt-4o-mini",
+  messages: [{ role: "user", content: "Tell me a story" }],
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0]?.delta?.content || "");
+}
+```
+
+### Async/Await
+
+All SDKs support async/await:
+
+```typescript
+async function main() {
+  const response = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Hello!" }],
+  });
+  
+  console.log(response.choices[0].message.content);
+}
+
+main();
+```
+
+### Error Handling
+
+Standard error handling works across all integrations:
+
+```typescript
+try {
+  const response = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Hello!" }],
+  });
+} catch (error) {
+  if (error.status === 429) {
+    console.error("Rate limited or insufficient credits");
+  } else if (error.status === 401) {
+    console.error("Invalid API key");
+  } else {
+    console.error("Request failed:", error.message);
+  }
+}
+```
+
+## Migration Guide
+
+### From OpenAI Direct
+
+<CodeGroup>
+```typescript Before
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+```
+
+```typescript After
+const client = new OpenAI({
+  baseURL: "https://ai-gateway.helicone.ai",
+  apiKey: process.env.HELICONE_API_KEY,
+});
+```
+</CodeGroup>
+
+### From Anthropic Direct
+
+<CodeGroup>
+```typescript Before
+const client = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+```
+
+```typescript After
+const client = new Anthropic({
+  apiKey: `Bearer ${process.env.HELICONE_API_KEY}`,
+  baseURL: "https://ai-gateway.helicone.ai",
+  defaultHeaders: {
+    "Helicone-Gateway-Body-Mapping": "NO_MAPPING",
+  },
+});
+```
+</CodeGroup>
+
+### From OpenRouter
+
+<CodeGroup>
+```typescript Before
+const client = new OpenAI({
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
+```
+
+```typescript After
+const client = new OpenAI({
+  baseURL: "https://ai-gateway.helicone.ai",
+  apiKey: process.env.HELICONE_API_KEY,
+});
+// Now supports 20+ providers with automatic routing
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Getting Started" icon="rocket" href="/gateway/getting-started">
+    Start using the AI Gateway
+  </Card>
+  <Card title="Routing" icon="route" href="/gateway/routing">
+    Learn about provider routing
+  </Card>
+  <Card title="Fallbacks" icon="shield" href="/gateway/fallbacks">
+    Configure automatic failover
+  </Card>
+  <Card title="Browse Models" icon="grid" href="https://www.helicone.ai/models">
+    Explore 300+ available models
+  </Card>
+</CardGroup>

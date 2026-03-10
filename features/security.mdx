@@ -1,0 +1,446 @@
+---
+title: 'Security & Compliance'
+description: 'Enterprise-grade security with SOC 2 compliance, encryption, and secure key management'
+---
+
+## Overview
+
+Helicone is built with enterprise-grade security from the ground up. We maintain SOC 2 Type II certification, implement encryption at rest and in transit, and provide secure API key management through our Vault feature.
+
+<Info>
+Helicone's security features ensure:
+- Your API keys and sensitive data are protected
+- Compliance with SOC 2, GDPR, and industry standards
+- Control over data storage and processing
+- Audit trails for all API interactions
+</Info>
+
+## Security Standards
+
+<CardGroup cols={2}>
+  <Card title="SOC 2 Type II" icon="shield-check">
+    Independently audited for security, availability, and confidentiality controls
+  </Card>
+  <Card title="GDPR Compliant" icon="scale-balanced">
+    Full compliance with European data protection regulations
+  </Card>
+  <Card title="Encryption" icon="lock">
+    AES-256 encryption at rest, TLS 1.3 in transit
+  </Card>
+  <Card title="Zero Trust" icon="fingerprint">
+    API key authentication with fine-grained access controls
+  </Card>
+</CardGroup>
+
+## Compliance Certifications
+
+### SOC 2 Type II
+
+Helicone maintains SOC 2 Type II compliance, demonstrating our commitment to:
+
+- **Security**: Protection against unauthorized access
+- **Availability**: System uptime and reliability  
+- **Confidentiality**: Secure handling of sensitive information
+- **Processing Integrity**: Accurate and authorized processing
+- **Privacy**: Protection of personal information
+
+<Note>
+SOC 2 reports are available to enterprise customers. Contact [enterprise@helicone.ai](mailto:enterprise@helicone.ai) to request access.
+</Note>
+
+### GDPR Compliance
+
+Our GDPR compliance includes:
+
+- **Data minimization**: We only collect necessary data
+- **Right to access**: Users can request their data
+- **Right to deletion**: Complete data removal on request
+- **Data portability**: Export data in standard formats
+- **Consent management**: Clear opt-in mechanisms
+- **Data processing agreements**: Available for all customers
+
+## Encryption
+
+### Data at Rest
+
+All data stored in Helicone is encrypted using:
+
+- **AES-256 encryption** for database records
+- **Transparent column-level encryption** for sensitive fields
+- **AEAD encryption** for API keys in Vault
+- **Encrypted backups** with separate key management
+
+```typescript
+// Provider API keys are encrypted with column-level encryption
+// Even database administrators cannot access raw keys
+const providerKey = {
+  provider: "openai",
+  key: "sk-...",  // Encrypted using AEAD with transparent encryption
+  organization: "org_123"
+};
+```
+
+### Data in Transit
+
+All communications use:
+
+- **TLS 1.3** for API requests
+- **HTTPS-only** endpoints (no HTTP)
+- **Certificate pinning** for mobile SDKs
+- **Perfect forward secrecy** for all connections
+
+### Key Management
+
+Encryption keys are:
+
+- Rotated regularly
+- Stored in hardware security modules (HSMs)
+- Never exposed in logs or error messages
+- Separate from data storage
+
+## Vault: Secure Key Management
+
+Helicone Vault provides secure storage and management for provider API keys.
+
+<CardGroup cols={2}>
+  <Card title="Centralized Storage" icon="vault">
+    Store all provider keys securely in one place
+  </Card>
+  <Card title="Proxy Keys" icon="key">
+    Generate Helicone proxy keys instead of distributing provider keys
+  </Card>
+  <Card title="Instant Revocation" icon="ban">
+    Revoke proxy keys immediately without rotating provider keys
+  </Card>
+  <Card title="Access Control" icon="user-lock">
+    Grant granular permissions per proxy key
+  </Card>
+</CardGroup>
+
+### How Vault Works
+
+**Without Vault:**
+```typescript
+// Users need both Helicone and provider keys
+const client = new OpenAI({
+  baseURL: "https://oai.helicone.ai/v1",
+  apiKey: process.env.OPENAI_API_KEY,
+  defaultHeaders: {
+    "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+  },
+});
+```
+
+**With Vault:**
+```typescript
+// Users only need a Helicone proxy key
+const client = new OpenAI({
+  baseURL: "https://oai.helicone.ai/v1",
+  apiKey: process.env.HELICONE_PROXY_KEY,  // One key for everything
+});
+```
+
+### Setting Up Vault
+
+<Steps>
+  <Step title="Store Provider Keys">
+    Navigate to [Vault Settings](https://us.helicone.ai/settings/vault) and add your provider API keys:
+    - OpenAI keys
+    - Anthropic keys  
+    - Other provider keys
+  </Step>
+  
+  <Step title="Create Proxy Keys">
+    Generate Helicone proxy keys that reference your stored provider keys. Each proxy key can have:
+    - Custom names and descriptions
+    - Rate limits
+    - Budget limits
+    - Usage tracking
+  </Step>
+  
+  <Step title="Distribute Proxy Keys">
+    Give proxy keys to users, departments, or applications. They never see the underlying provider keys.
+  </Step>
+  
+  <Step title="Monitor and Revoke">
+    Track usage per proxy key and revoke access instantly if needed.
+  </Step>
+</Steps>
+
+### Vault Security Features
+
+**Provider Key Encryption:**
+- AEAD (Authenticated Encryption with Associated Data)
+- Column-level transparent encryption
+- Keys never appear in database dumps
+- Separate key management infrastructure
+
+**Proxy Key Security:**
+- One-way hashing (cannot be reverse-engineered)
+- Unique per creation
+- Instantly revocable
+- No rate limit on creation
+
+**Use Cases:**
+
+<Tabs>
+  <Tab title="Departmental Access">
+    Create separate proxy keys per department:
+
+    ```typescript
+    // Engineering team
+    const engineeringKey = "sk-helicone-engineering-..."
+
+    // Marketing team  
+    const marketingKey = "sk-helicone-marketing-..."
+
+    // Track spending and usage separately
+    ```
+  </Tab>
+  
+  <Tab title="Temporary Access">
+    Grant time-limited access for events:
+
+    ```typescript
+    // Create proxy key for hackathon
+    const hackathonKey = await createProxyKey({
+      name: "Hackathon 2024",
+      rateLimit: "1000;w=86400",  // 1000 requests/day
+    });
+
+    // Revoke after event
+    await revokeProxyKey(hackathonKey.id);
+    ```
+  </Tab>
+  
+  <Tab title="Client Projects">
+    Agencies can create keys per client:
+
+    ```typescript
+    // Client A proxy key
+    const clientAKey = await createProxyKey({
+      name: "Client A",
+      properties: { client: "client-a" },
+    });
+
+    // Separate billing and monitoring
+    ```
+  </Tab>
+</Tabs>
+
+## Access Control
+
+### API Key Types
+
+| Key Type | Permissions | Use Case |
+|----------|-------------|----------|
+| **API Key** | Full organization access | Application integration |
+| **Proxy Key** | Limited to stored provider keys | User distribution |
+| **Read-Only Key** | View logs and metrics only | Analytics tools |
+
+### Role-Based Access Control (RBAC)
+
+Control team member permissions:
+
+- **Owner**: Full administrative access
+- **Admin**: Manage settings, keys, and team
+- **Member**: View logs and analytics
+- **Viewer**: Read-only access to dashboard
+
+### IP Allowlisting
+
+Restrict API access to specific IP ranges:
+
+```typescript
+// Configure in dashboard or via API
+const ipAllowlist = {
+  enabled: true,
+  ranges: [
+    "203.0.113.0/24",
+    "198.51.100.0/24"
+  ]
+};
+```
+
+## Data Privacy
+
+### Data Retention
+
+- **Request logs**: 90 days default (configurable up to 2 years)
+- **Analytics data**: Aggregated and retained indefinitely
+- **Deleted data**: Permanently removed within 30 days
+- **Backups**: Encrypted and retained for 90 days
+
+### Data Deletion
+
+Request complete data deletion:
+
+1. Contact [privacy@helicone.ai](mailto:privacy@helicone.ai)
+2. We delete all associated data within 30 days
+3. Confirmation provided upon completion
+
+### Data Export
+
+Export your data anytime:
+
+```bash
+curl https://api.helicone.ai/v1/export \
+  -H "Authorization: Bearer $HELICONE_API_KEY" \
+  -d '{
+    "start_date": "2024-01-01",
+    "end_date": "2024-03-10",
+    "format": "json"
+  }'
+```
+
+## Self-Hosting
+
+For maximum control, deploy Helicone on your infrastructure:
+
+<CardGroup cols={2}>
+  <Card title="Docker Deployment" icon="docker" href="/self-hosting/docker">
+    Single-command deployment with Docker Compose
+  </Card>
+  <Card title="Kubernetes" icon="dharmachakra" href="/self-hosting/kubernetes">
+    Production-ready Helm charts for Kubernetes
+  </Card>
+</CardGroup>
+
+**Self-hosting benefits:**
+- Complete data sovereignty
+- Custom compliance requirements
+- Air-gapped deployments
+- No data leaves your infrastructure
+
+## Audit Logging
+
+Comprehensive audit trails for compliance:
+
+- **API access logs**: Every request logged with timestamp, IP, and user
+- **Configuration changes**: Track all settings modifications
+- **Key creation/revocation**: Full audit trail of key management
+- **Data access**: Log all data exports and deletions
+
+```typescript
+// Example audit log entry
+{
+  "timestamp": "2024-03-10T14:32:00Z",
+  "action": "proxy_key_created",
+  "actor": "admin@company.com",
+  "ip_address": "203.0.113.45",
+  "details": {
+    "key_id": "proxy_123",
+    "key_name": "Engineering Team"
+  }
+}
+```
+
+## Security Best Practices
+
+<AccordionGroup>
+  <Accordion title="Rotate API keys regularly">
+    Rotate Helicone API keys every 90 days. Use Vault proxy keys for distribution to simplify rotation.
+  </Accordion>
+
+  <Accordion title="Use environment variables">
+    Never hardcode API keys in source code:
+
+    ```typescript
+    // Good ✓
+    apiKey: process.env.HELICONE_API_KEY
+
+    // Bad ✗
+    apiKey: "sk-helicone-abc123..."
+    ```
+  </Accordion>
+
+  <Accordion title="Implement rate limiting">
+    Protect against abuse with rate limits:
+
+    ```typescript
+    defaultHeaders: {
+      "Helicone-RateLimit-Policy": "1000;w=3600;s=user"
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Monitor for anomalies">
+    Set up alerts for unusual patterns:
+    - Unexpected cost spikes
+    - Failed authentication attempts
+    - Unusual request volumes
+    - New IP addresses
+  </Accordion>
+
+  <Accordion title="Minimize data exposure">
+    Configure logging to exclude sensitive data:
+
+    ```typescript
+    defaultHeaders: {
+      "Helicone-Omit-Request": "true",  // Don't log request body
+      "Helicone-Omit-Response": "true"  // Don't log response body
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Use HTTPS only">
+    Always use HTTPS endpoints. Helicone rejects HTTP requests:
+
+    ```typescript
+    // Correct
+    baseURL: "https://ai-gateway.helicone.ai"
+
+    // Will fail
+    baseURL: "http://ai-gateway.helicone.ai"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Incident Response
+
+In case of security concerns:
+
+1. **Report immediately**: [security@helicone.ai](mailto:security@helicone.ai)
+2. **Include details**: Timeline, affected resources, potential impact
+3. **We respond within**: 24 hours for all reports, 4 hours for critical issues
+4. **We provide**: Incident timeline, remediation steps, prevention measures
+
+## Security Resources
+
+<CardGroup cols={2}>
+  <Card title="Security Policy" icon="file-shield" href="https://helicone.ai/security">
+    Read our full security policy
+  </Card>
+  <Card title="Penetration Testing" icon="bug">
+    Annual third-party security assessments
+  </Card>
+  <Card title="Bug Bounty" icon="trophy" href="https://helicone.ai/security/bug-bounty">
+    Responsible disclosure program
+  </Card>
+  <Card title="Status Page" icon="heart-pulse" href="https://status.helicone.ai">
+    Real-time system status and incidents
+  </Card>
+</CardGroup>
+
+## Compliance Documentation
+
+Enterprise customers can access:
+
+- SOC 2 Type II reports
+- Penetration test results
+- Data processing agreements (DPA)
+- Business associate agreements (BAA)
+- Security questionnaires
+
+Contact [enterprise@helicone.ai](mailto:enterprise@helicone.ai) for access.
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Self-Hosting" icon="server" href="/self-hosting/overview">
+    Deploy Helicone on your infrastructure
+  </Card>
+  <Card title="API Authentication" icon="key" href="/essentials/authentication">
+    Learn about API key management
+  </Card>
+</CardGroup>

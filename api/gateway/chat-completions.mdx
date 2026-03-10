@@ -1,0 +1,443 @@
+---
+title: 'Chat Completions'
+description: 'Create chat completions using any supported LLM provider'
+---
+
+## Overview
+
+The Chat Completions endpoint provides a unified OpenAI-compatible interface to interact with multiple LLM providers. Use this endpoint to send messages and receive responses from models across providers like OpenAI, Anthropic, Google, and more.
+
+## Endpoint
+
+```
+POST https://ai-gateway.helicone.ai/v1/chat/completions
+```
+
+## Authentication
+
+Include your Helicone API key in the request:
+
+```bash
+curl https://ai-gateway.helicone.ai/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_HELICONE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4",
+    "messages": [
+      {"role": "user", "content": "Hello!"}
+    ]
+  }'
+```
+
+## Request Body
+
+<ParamField body="model" type="string" required>
+  The model to use for completion. Supports comma-separated fallback models (e.g., `"gpt-4,claude-3-5-sonnet-20241022"`).
+  
+  See [supported models](https://helicone.ai/models) for the full list.
+</ParamField>
+
+<ParamField body="messages" type="array" required>
+  An array of message objects that form the conversation history.
+  
+  Each message must include:
+  - `role`: One of `"system"`, `"user"`, `"assistant"`, `"tool"`, or `"developer"`
+  - `content`: The message content (string or array of content parts)
+  
+  Example:
+  ```json
+  [
+    {"role": "system", "content": "You are a helpful assistant."},
+    {"role": "user", "content": "What is the capital of France?"}
+  ]
+  ```
+</ParamField>
+
+<ParamField body="max_tokens" type="integer">
+  The maximum number of tokens to generate in the completion.
+</ParamField>
+
+<ParamField body="max_completion_tokens" type="integer">
+  Alternative to `max_tokens`. The maximum number of tokens to generate.
+</ParamField>
+
+<ParamField body="temperature" type="number">
+  Sampling temperature between 0 and 2. Higher values make output more random.
+  
+  Default: `1.0`
+</ParamField>
+
+<ParamField body="top_p" type="number">
+  Nucleus sampling parameter. The model considers tokens with top_p probability mass.
+  
+  Default: `1.0`
+</ParamField>
+
+<ParamField body="n" type="integer">
+  Number of completions to generate. Must be between 1 and 128.
+  
+  Default: `1`
+</ParamField>
+
+<ParamField body="stream" type="boolean">
+  Whether to stream the response as server-sent events.
+  
+  Default: `false`
+</ParamField>
+
+<ParamField body="stream_options" type="object">
+  Options for streaming responses.
+  
+  - `include_usage`: Whether to include usage statistics in stream
+  - `include_obfuscation`: Whether to include obfuscation data
+</ParamField>
+
+<ParamField body="stop" type="string | array">
+  Up to 4 sequences where the API will stop generating tokens.
+</ParamField>
+
+<ParamField body="frequency_penalty" type="number">
+  Number between -2.0 and 2.0. Positive values penalize tokens based on their frequency.
+  
+  Default: `0`
+</ParamField>
+
+<ParamField body="presence_penalty" type="number">
+  Number between -2.0 and 2.0. Positive values penalize tokens based on their presence.
+  
+  Default: `0`
+</ParamField>
+
+<ParamField body="logprobs" type="boolean">
+  Whether to return log probabilities of output tokens.
+  
+  Default: `false`
+</ParamField>
+
+<ParamField body="top_logprobs" type="integer">
+  Number of most likely tokens to return at each position (0-20). Requires `logprobs: true`.
+</ParamField>
+
+<ParamField body="logit_bias" type="object">
+  Modify likelihood of specified tokens appearing. Maps token IDs to bias values (-100 to 100).
+</ParamField>
+
+<ParamField body="user" type="string">
+  A unique identifier for the end-user, for abuse monitoring.
+</ParamField>
+
+<ParamField body="seed" type="integer">
+  Seed for deterministic sampling. Must be between -9223372036854775808 and 9223372036854775807.
+</ParamField>
+
+<ParamField body="response_format" type="object">
+  Format of the response. Options:
+  - `{"type": "text"}` - Plain text response
+  - `{"type": "json_object"}` - Valid JSON object
+  - `{"type": "json_schema", "json_schema": {...}}` - JSON matching schema
+</ParamField>
+
+<ParamField body="tools" type="array">
+  List of tools the model can call. Each tool has:
+  - `type`: `"function"` or `"custom"`
+  - `function`: Function definition with `name`, `description`, and `parameters`
+</ParamField>
+
+<ParamField body="tool_choice" type="string | object">
+  Controls which tool is called:
+  - `"none"`: No tool is called
+  - `"auto"`: Model decides
+  - `"required"`: Model must call a tool
+  - Object: Force specific tool
+</ParamField>
+
+<ParamField body="parallel_tool_calls" type="boolean">
+  Whether to enable parallel function calling.
+  
+  Default: `true`
+</ParamField>
+
+<ParamField body="reasoning_effort" type="string">
+  Level of reasoning effort for models that support it. Options: `"minimal"`, `"low"`, `"medium"`, `"high"`
+</ParamField>
+
+<ParamField body="reasoning_options" type="object">
+  Advanced reasoning options:
+  - `budget_tokens`: Token budget for reasoning
+</ParamField>
+
+<ParamField body="modalities" type="array">
+  Output modalities supported by the model. Currently supports `["text"]`.
+</ParamField>
+
+<ParamField body="prediction" type="object">
+  Predicted content to optimize latency:
+  - `type`: `"content"`
+  - `content`: Predicted message content
+  - `reasoning`: Optional reasoning text
+</ParamField>
+
+<ParamField body="context_editing" type="object">
+  Context management configuration (Anthropic models only):
+  - `enabled`: Enable context editing
+  - `clear_tool_uses`: Auto-clear tool call history
+  - `clear_thinking`: Manage reasoning traces
+</ParamField>
+
+<ParamField body="store" type="boolean">
+  Whether to store the completion for later use.
+  
+  Default: `false`
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Additional metadata to attach to the request.
+</ParamField>
+
+<ParamField body="service_tier" type="string">
+  Service tier for the request. Options: `"auto"`, `"default"`, `"flex"`, `"scale"`, `"priority"`
+</ParamField>
+
+<ParamField body="cache_control" type="object">
+  Cache control settings:
+  - `type`: `"ephemeral"`
+  - `ttl`: Time to live for cached response
+</ParamField>
+
+## Helicone-Specific Parameters
+
+### Model Fallbacks
+
+Provide multiple models separated by commas for automatic fallback:
+
+```json
+{
+  "model": "gpt-4,claude-3-5-sonnet-20241022,gemini-2.0-flash-exp",
+  "messages": [...]
+}
+```
+
+### Provider Exclusion
+
+Exclude specific providers using the `!` prefix:
+
+```json
+{
+  "model": "!openai,gpt-4",
+  "messages": [...]
+}
+```
+
+### Prompt Integration
+
+Use stored prompts with variable substitution:
+
+<ParamField body="prompt_id" type="string">
+  ID of the Helicone prompt to use
+</ParamField>
+
+<ParamField body="version_id" type="string">
+  Specific version of the prompt (optional)
+</ParamField>
+
+<ParamField body="environment" type="string">
+  Environment for prompt resolution (e.g., `"production"`, `"staging"`)
+</ParamField>
+
+<ParamField body="inputs" type="object">
+  Variables to substitute in the prompt template
+</ParamField>
+
+### Plugins
+
+<ParamField body="plugins" type="array">
+  Array of plugins to apply to the request. Each plugin configures additional functionality.
+</ParamField>
+
+## Response Format
+
+<ResponseField name="id" type="string">
+  Unique identifier for the completion
+</ResponseField>
+
+<ResponseField name="object" type="string">
+  Object type, always `"chat.completion"`
+</ResponseField>
+
+<ResponseField name="created" type="integer">
+  Unix timestamp of when the completion was created
+</ResponseField>
+
+<ResponseField name="model" type="string">
+  The model used for completion
+</ResponseField>
+
+<ResponseField name="choices" type="array">
+  Array of completion choices. Each choice contains:
+  - `index`: Choice index
+  - `message`: The generated message with `role` and `content`
+  - `finish_reason`: Reason completion stopped (`"stop"`, `"length"`, `"tool_calls"`, etc.)
+  - `logprobs`: Log probabilities if requested
+</ResponseField>
+
+<ResponseField name="usage" type="object">
+  Token usage statistics:
+  - `prompt_tokens`: Tokens in the prompt
+  - `completion_tokens`: Tokens in the completion
+  - `total_tokens`: Total tokens used
+</ResponseField>
+
+<ResponseField name="system_fingerprint" type="string">
+  System fingerprint for the model configuration
+</ResponseField>
+
+## Examples
+
+### Basic Chat Completion
+
+```bash
+curl https://ai-gateway.helicone.ai/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_HELICONE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "What is the capital of France?"}
+    ],
+    "temperature": 0.7,
+    "max_tokens": 150
+  }'
+```
+
+### Streaming Response
+
+```bash
+curl https://ai-gateway.helicone.ai/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_HELICONE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4",
+    "messages": [{"role": "user", "content": "Tell me a story"}],
+    "stream": true,
+    "stream_options": {"include_usage": true}
+  }'
+```
+
+### Function Calling
+
+```bash
+curl https://ai-gateway.helicone.ai/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_HELICONE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4",
+    "messages": [{"role": "user", "content": "What is the weather in Boston?"}],
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_weather",
+          "description": "Get the current weather in a location",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "location": {"type": "string", "description": "City name"}
+            },
+            "required": ["location"]
+          }
+        }
+      }
+    ]
+  }'
+```
+
+### Model Fallback
+
+```bash
+curl https://ai-gateway.helicone.ai/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_HELICONE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4,claude-3-5-sonnet-20241022",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+```
+
+### Using Stored Prompts
+
+```bash
+curl https://ai-gateway.helicone.ai/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_HELICONE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4",
+    "prompt_id": "my-prompt-id",
+    "environment": "production",
+    "inputs": {
+      "user_name": "Alice",
+      "topic": "AI"
+    }
+  }'
+```
+
+## Response Example
+
+```json
+{
+  "id": "chatcmpl-abc123",
+  "object": "chat.completion",
+  "created": 1709251200,
+  "model": "gpt-4",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "The capital of France is Paris."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 25,
+    "completion_tokens": 8,
+    "total_tokens": 33
+  }
+}
+```
+
+## Error Responses
+
+The endpoint returns standard HTTP status codes:
+
+- `400`: Invalid request (missing required fields, invalid model, etc.)
+- `401`: Authentication failed
+- `403`: Access forbidden (suspended account, etc.)
+- `429`: Rate limit exceeded or insufficient credits
+- `500`: Internal server error
+
+Error response format:
+
+```json
+{
+  "error": {
+    "message": "Invalid model specified",
+    "type": "invalid_request_error",
+    "code": "invalid_model"
+  }
+}
+```
+
+## Additional Headers
+
+Helicone supports custom headers for enhanced functionality:
+
+- `Helicone-User-Id`: Track requests by user
+- `Helicone-Session-Id`: Group requests into sessions
+- `Helicone-Property-*`: Add custom properties
+- `Helicone-Cache-Enabled`: Enable response caching
+- `Helicone-RateLimit-Policy`: Apply custom rate limits
+- `Helicone-Prompt-Id`: Use a stored prompt
+
+See the [Features documentation](/features) for more details on these capabilities.

@@ -1,0 +1,643 @@
+---
+title: "Traces"
+sidebarTitle: "Traces"
+description: "Log custom traces for non-LLM operations like database queries, API calls, and tool executions to get complete visibility into your AI workflows"
+"twitter:title": "Traces - Helicone OSS LLM Observability"
+---
+
+import QuestionsSection from "/snippets/questions-section.mdx";
+
+While Helicone automatically tracks LLM requests, your AI workflows often include other operations: database queries, API calls, vector searches, and custom business logic. Traces let you log these non-LLM operations to get complete end-to-end visibility into your application.
+
+## Why Use Traces
+
+**LLM requests are only part of the story.** A typical AI agent workflow includes:
+
+- 🔍 Vector database searches for retrieval
+- 🗄️ Database queries to fetch context
+- 🌐 External API calls to tools and services
+- ⚙️ Custom processing and validation logic
+- 📊 Data transformations and formatting
+
+**With traces, you can:**
+- ✅ See the complete workflow, not just LLM calls
+- ✅ Measure latency across your entire stack
+- ✅ Debug issues in non-LLM components
+- ✅ Understand the full cost of operations (time, API calls)
+- ✅ Visualize traces alongside LLM requests in sessions
+
+## Quick Start
+
+<Steps>
+<Step title="Install the SDK (Optional)">
+While you can use raw HTTP, the SDK makes it easier:
+
+```bash
+npm install @helicone/helpers
+```
+</Step>
+
+<Step title="Log a Custom Trace">
+Log any operation by sending request/response data:
+
+```typescript
+import { HeliconeManualLogger } from "@helicone/helpers";
+
+const logger = new HeliconeManualLogger({
+  apiKey: process.env.HELICONE_API_KEY
+});
+
+// Log a database query
+await logger.logRequest(
+  {
+    query: "SELECT * FROM users WHERE id = ?",
+    params: [userId]
+  },
+  async (resultRecorder) => {
+    const result = await db.query("SELECT * FROM users WHERE id = ?", [userId]);
+    resultRecorder.appendResults(result);
+    return result;
+  },
+  {
+    "Helicone-Property-Operation": "database_query",
+    "Helicone-Property-Table": "users"
+  }
+);
+```
+</Step>
+
+<Step title="View in Dashboard">
+Traces appear alongside LLM requests:
+- View all traces in the Requests page
+- Filter by custom properties to find specific traces
+- When used with sessions, traces appear in the session timeline
+</Step>
+</Steps>
+
+## Trace API Endpoint
+
+Helicone provides a REST API for logging custom traces:
+
+### Endpoint
+
+```
+POST https://api.helicone.ai/v1/trace/custom/log
+```
+
+### Headers
+
+```bash
+Authorization: Bearer YOUR_HELICONE_API_KEY
+Content-Type: application/json
+```
+
+### Request Body
+
+Log the "request" and "response" of any operation:
+
+```json
+{
+  "providerRequest": {
+    "url": "https://api.example.com/endpoint",
+    "json": {
+      "query": "search query",
+      "filters": { "category": "products" }
+    },
+    "meta": {
+      "helicone-request-id": "optional-custom-id",
+      "helicone-user-id": "user-123"
+    }
+  },
+  "providerResponse": {
+    "json": {
+      "results": [/* response data */],
+      "count": 42
+    },
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "timing": {
+    "startTime": 1709222400,
+    "endTime": 1709222402,
+    "timeToFirstToken": 150
+  },
+  "provider": "CUSTOM"
+}
+```
+
+## Common Trace Patterns
+
+### Database Query
+
+Log database operations to track query performance:
+
+<CodeGroup>
+```typescript TypeScript
+import { HeliconeManualLogger } from "@helicone/helpers";
+
+const logger = new HeliconeManualLogger({
+  apiKey: process.env.HELICONE_API_KEY
+});
+
+const startTime = Date.now();
+
+// Log the database query
+await logger.logRequest(
+  {
+    query: "SELECT * FROM documents WHERE user_id = ? AND created_at > ?",
+    params: [userId, startDate]
+  },
+  async (resultRecorder) => {
+    const results = await database.query(
+      "SELECT * FROM documents WHERE user_id = ? AND created_at > ?",
+      [userId, startDate]
+    );
+    
+    resultRecorder.appendResults({
+      rowCount: results.length,
+      executionTime: Date.now() - startTime
+    });
+    
+    return results;
+  },
+  {
+    "Helicone-Property-Operation": "database_query",
+    "Helicone-Property-Table": "documents",
+    "Helicone-User-Id": userId
+  }
+);
+```
+
+```bash cURL
+curl -X POST https://api.helicone.ai/v1/trace/custom/log \
+  -H "Authorization: Bearer $HELICONE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Helicone-Property-Operation: database_query" \
+  -H "Helicone-Property-Table: documents" \
+  -d '{
+    "providerRequest": {
+      "url": "postgres://localhost:5432/mydb",
+      "json": {
+        "query": "SELECT * FROM documents WHERE user_id = ?",
+        "params": ["user-123"]
+      },
+      "meta": {
+        "helicone-user-id": "user-123"
+      }
+    },
+    "providerResponse": {
+      "json": {
+        "rowCount": 42,
+        "executionTime": 156
+      },
+      "status": 200
+    },
+    "timing": {
+      "startTime": 1709222400,
+      "endTime": 1709222400
+    },
+    "provider": "POSTGRES"
+  }'
+```
+</CodeGroup>
+
+### Vector Database Search
+
+Track vector searches and embeddings:
+
+```typescript
+import { HeliconeManualLogger } from "@helicone/helpers";
+
+const logger = new HeliconeManualLogger({
+  apiKey: process.env.HELICONE_API_KEY
+});
+
+// Log vector search operation
+await logger.logRequest(
+  {
+    query: "semantic search query",
+    embedding: [/* vector */],
+    topK: 10
+  },
+  async (resultRecorder) => {
+    const results = await vectorDB.search({
+      query: "semantic search query",
+      topK: 10
+    });
+    
+    resultRecorder.appendResults({
+      resultsCount: results.length,
+      topScore: results[0]?.score
+    });
+    
+    return results;
+  },
+  {
+    "Helicone-Property-Operation": "vector_search",
+    "Helicone-Property-Collection": "documents",
+    "Helicone-Session-Id": sessionId, // Include in session
+    "Helicone-Session-Path": "/search/vector"
+  }
+);
+```
+
+### External API Call
+
+Log calls to external services:
+
+```typescript
+const logger = new HeliconeManualLogger({
+  apiKey: process.env.HELICONE_API_KEY
+});
+
+// Log API call to external service
+await logger.logRequest(
+  {
+    method: "POST",
+    endpoint: "/api/analyze",
+    body: { text: userInput }
+  },
+  async (resultRecorder) => {
+    const response = await fetch("https://api.external-service.com/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: userInput })
+    });
+    
+    const result = await response.json();
+    resultRecorder.appendResults(result);
+    
+    return result;
+  },
+  {
+    "Helicone-Property-Operation": "external_api",
+    "Helicone-Property-Service": "text_analyzer",
+    "Helicone-Session-Id": sessionId
+  }
+);
+```
+
+### Tool Execution
+
+Log AI agent tool calls:
+
+```typescript
+const logger = new HeliconeManualLogger({
+  apiKey: process.env.HELICONE_API_KEY
+});
+
+// Log tool execution
+await logger.logRequest(
+  {
+    tool: "web_search",
+    parameters: {
+      query: "latest AI news",
+      maxResults: 10
+    }
+  },
+  async (resultRecorder) => {
+    const searchResults = await webSearchTool.execute({
+      query: "latest AI news",
+      maxResults: 10
+    });
+    
+    resultRecorder.appendResults({
+      resultsFound: searchResults.length,
+      sources: searchResults.map(r => r.url)
+    });
+    
+    return searchResults;
+  },
+  {
+    "Helicone-Property-Operation": "tool_execution",
+    "Helicone-Property-Tool": "web_search",
+    "Helicone-Session-Id": sessionId,
+    "Helicone-Session-Path": "/agent/tools/search"
+  }
+);
+```
+
+## Traces in Sessions
+
+Combine traces with sessions to see your complete workflow:
+
+```typescript
+import { randomUUID } from "crypto";
+import { OpenAI } from "openai";
+import { HeliconeManualLogger } from "@helicone/helpers";
+
+const client = new OpenAI({
+  baseURL: "https://ai-gateway.helicone.ai",
+  apiKey: process.env.HELICONE_API_KEY
+});
+
+const logger = new HeliconeManualLogger({
+  apiKey: process.env.HELICONE_API_KEY
+});
+
+const sessionId = randomUUID();
+const sessionName = "Research Agent";
+
+// Step 1: Vector search (traced)
+await logger.logRequest(
+  { query: "quantum computing research" },
+  async (resultRecorder) => {
+    const results = await vectorDB.search("quantum computing research");
+    resultRecorder.appendResults({ count: results.length });
+    return results;
+  },
+  {
+    "Helicone-Session-Id": sessionId,
+    "Helicone-Session-Path": "/research/search",
+    "Helicone-Session-Name": sessionName,
+    "Helicone-Property-Operation": "vector_search"
+  }
+);
+
+// Step 2: LLM analysis (automatic)
+const analysis = await client.chat.completions.create(
+  {
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Analyze these research papers..." }]
+  },
+  {
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Path": "/research/analyze",
+      "Helicone-Session-Name": sessionName
+    }
+  }
+);
+
+// Step 3: Database save (traced)
+await logger.logRequest(
+  { operation: "insert", table: "research_results" },
+  async (resultRecorder) => {
+    await db.insert("research_results", { /* data */ });
+    resultRecorder.appendResults({ success: true });
+  },
+  {
+    "Helicone-Session-Id": sessionId,
+    "Helicone-Session-Path": "/research/save",
+    "Helicone-Session-Name": sessionName,
+    "Helicone-Property-Operation": "database_write"
+  }
+);
+```
+
+In the session view, you'll see:
+- `/research/search` - Vector search trace
+- `/research/analyze` - LLM request
+- `/research/save` - Database write trace
+
+## Typed Trace API
+
+For stricter type safety, use the typed trace endpoint:
+
+### Endpoint
+
+```
+POST https://api.helicone.ai/v1/trace/custom/log/typed
+```
+
+### Request Body
+
+```typescript
+interface TypedAsyncLogModel {
+  providerRequest: {
+    url: string;
+    json: Record<string, any>;
+    meta: Record<string, string>;
+  };
+  providerResponse: {
+    json: Record<string, any>;
+    textBody?: string;
+    status: number;
+    headers: Record<string, string>;
+  };
+  timing?: {
+    startTime: number;       // Unix timestamp (seconds)
+    endTime: number;         // Unix timestamp (seconds)
+    timeToFirstToken?: number; // Milliseconds
+  };
+  provider: string;
+}
+```
+
+### Example
+
+```bash
+curl -X POST https://api.helicone.ai/v1/trace/custom/log/typed \
+  -H "Authorization: Bearer $HELICONE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "providerRequest": {
+      "url": "https://api.example.com/search",
+      "json": {
+        "query": "search term",
+        "limit": 10
+      },
+      "meta": {
+        "helicone-user-id": "user-123"
+      }
+    },
+    "providerResponse": {
+      "json": {
+        "results": [/* ... */],
+        "total": 42
+      },
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      }
+    },
+    "timing": {
+      "startTime": 1709222400,
+      "endTime": 1709222402
+    },
+    "provider": "CUSTOM_API"
+  }'
+```
+
+## Trace Metadata
+
+Add custom properties to traces for filtering and analysis:
+
+```typescript
+const headers = {
+  // Standard trace metadata
+  "Helicone-Request-Id": customRequestId,
+  "Helicone-User-Id": userId,
+  
+  // Session tracking
+  "Helicone-Session-Id": sessionId,
+  "Helicone-Session-Path": "/workflow/step",
+  "Helicone-Session-Name": "My Workflow",
+  
+  // Custom properties
+  "Helicone-Property-Operation": "database_query",
+  "Helicone-Property-Table": "users",
+  "Helicone-Property-Environment": "production",
+  "Helicone-Property-Component": "user_service"
+};
+
+await logger.logRequest(requestData, handler, headers);
+```
+
+## Performance Tracking
+
+Traces include timing information to help you identify bottlenecks:
+
+```typescript
+const startTime = Date.now();
+
+await logger.logRequest(
+  requestData,
+  async (resultRecorder) => {
+    const result = await performOperation();
+    
+    // Log performance metrics
+    resultRecorder.appendResults({
+      result,
+      performanceMetrics: {
+        durationMs: Date.now() - startTime,
+        operationsPerformed: result.length
+      }
+    });
+    
+    return result;
+  },
+  headers
+);
+```
+
+## OpenTelemetry Integration
+
+Helicone also supports native OpenTelemetry traces:
+
+```
+POST https://api.helicone.ai/v1/trace/log
+```
+
+Send OpenTelemetry span data directly to Helicone. This is useful if you're already using OpenTelemetry in your application.
+
+See the [trace proto file](https://github.com/Helicone/helicone/blob/main/valhalla/jawn/src/utils/trace.proto) for the expected format.
+
+## Best Practices
+
+### What to Trace
+
+✅ **Do trace:**
+- Database queries (especially slow ones)
+- External API calls
+- Vector database searches
+- Tool executions in agents
+- Custom business logic with significant latency
+- Operations that could fail or timeout
+
+❌ **Don't trace:**
+- Trivial in-memory operations
+- Simple variable assignments
+- Fast operations (&lt;1ms)
+- Operations with sensitive data (unless you sanitize it)
+
+### Trace Granularity
+
+✅ **Good granularity:**
+```typescript
+// Trace at the operation level
+await logger.logRequest(/* database query */);
+await logger.logRequest(/* API call */);
+await logger.logRequest(/* vector search */);
+```
+
+❌ **Too granular:**
+```typescript
+// Don't trace every tiny step
+await logger.logRequest(/* parse JSON */);
+await logger.logRequest(/* validate data */);
+await logger.logRequest(/* format response */);
+```
+
+### Sensitive Data
+
+Sanitize sensitive information before logging:
+
+```typescript
+await logger.logRequest(
+  {
+    query: "SELECT * FROM users WHERE email = ?",
+    params: ["[REDACTED]"]  // Don't log actual email
+  },
+  async (resultRecorder) => {
+    const result = await db.query(/* actual query */);
+    
+    // Sanitize result before logging
+    resultRecorder.appendResults({
+      rowCount: result.length,
+      // Don't log actual user data
+    });
+    
+    return result;
+  },
+  headers
+);
+```
+
+## Troubleshooting
+
+### Traces Not Appearing
+
+**Problem**: Traces aren't showing up in the dashboard.
+
+**Solutions**:
+- Verify API key is correct and has write permissions
+- Check that request body matches the expected format
+- Look for HTTP error responses (400, 401, 500)
+- Ensure `resultRecorder.appendResults()` is called
+
+### Traces Not in Sessions
+
+**Problem**: Traces aren't appearing in session timeline.
+
+**Solutions**:
+- Include all three session headers:
+  - `Helicone-Session-Id`
+  - `Helicone-Session-Path`
+  - `Helicone-Session-Name`
+- Use the same session ID as other requests in the session
+- Verify paths follow the `/parent/child` format
+
+### Performance Impact
+
+**Problem**: Logging traces is slowing down your application.
+
+**Solutions**:
+- Use async logging (don't await the log call if possible)
+- Batch multiple operations before logging
+- Only log operations that are actually slow (>100ms)
+- Consider sampling: only log a percentage of traces
+
+## Related Features
+
+<CardGroup cols={2}>
+<Card title="Sessions" icon="diagram-project" href="/observability/sessions">
+Group traces and LLM requests into sessions
+</Card>
+
+<Card title="Custom Properties" icon="tags" href="/observability/custom-properties">
+Add metadata to traces for filtering and analysis
+</Card>
+
+<Card title="Requests" icon="file-lines" href="/observability/requests">
+View traces alongside LLM requests
+</Card>
+
+<Card title="Manual Logger" icon="code" href="https://www.npmjs.com/package/@helicone/helpers">
+Helicone SDK for easier trace logging
+</Card>
+</CardGroup>
+
+<QuestionsSection />

@@ -1,0 +1,234 @@
+---
+title: 'Authentication'
+description: 'Learn how to authenticate requests to the Helicone API'
+---
+
+## API Keys
+
+Helicone uses API keys to authenticate requests to the REST API. You can create and manage your API keys from the [Helicone dashboard](https://helicone.ai/dashboard).
+
+### Getting Your API Key
+
+1. Sign up or log in at [helicone.ai](https://helicone.ai/signup)
+2. Navigate to **Settings** > **API Keys**
+3. Click **Create API Key**
+4. Copy your API key and store it securely
+
+<Warning>
+Never share your API keys publicly or commit them to version control. Use environment variables to store your keys.
+</Warning>
+
+## API Key Format
+
+Helicone API keys follow specific patterns:
+
+- Standard keys: `sk-helicone-[7chars]-[7chars]-[7chars]-[7chars]`
+- Proxy keys: `sk-helicone-proxy-[uuid]`
+- Rate-limited keys: `sk-helicone-rl-[7chars]-[7chars]-[7chars]-[7chars]`
+- EU region keys: `sk-helicone-eu-[7chars]-[7chars]-[7chars]-[7chars]`
+
+## Authentication Methods
+
+There are two ways to authenticate API requests:
+
+### Method 1: Authorization Header (Recommended)
+
+Include your API key in the `Authorization` header using Bearer authentication:
+
+```bash
+curl https://api.helicone.ai/v1/request/query \
+  -H "Authorization: Bearer YOUR_HELICONE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"filter": {}, "limit": 10}'
+```
+
+### Method 2: Helicone-Auth Header
+
+Alternatively, use the `Helicone-Auth` header:
+
+```bash
+curl https://api.helicone.ai/v1/request/query \
+  -H "Helicone-Auth: Bearer YOUR_HELICONE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"filter": {}, "limit": 10}'
+```
+
+## Key Permissions
+
+API keys can have different permission levels:
+
+| Permission | Description | Use Cases |
+|------------|-------------|------------|
+| **rw** | Read and Write (default) | Full access to all endpoints |
+| **r** | Read-only | Query data without modification |
+| **w** | Write-only | Log requests without reading data |
+
+You can specify permissions when creating an API key:
+
+```bash
+curl https://api.helicone.ai/v1/api-keys \
+  -X POST \
+  -H "Authorization: Bearer YOUR_HELICONE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "api_key_name": "My API Key",
+    "key_permissions": "rw"
+  }'
+```
+
+## Authentication in Code
+
+### TypeScript/JavaScript
+
+```typescript
+const HELICONE_API_KEY = process.env.HELICONE_API_KEY;
+
+const response = await fetch('https://api.helicone.ai/v1/request/query', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${HELICONE_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    filter: {},
+    limit: 10,
+    offset: 0,
+  }),
+});
+
+const data = await response.json();
+```
+
+### Python
+
+```python
+import os
+import requests
+
+HELICONE_API_KEY = os.environ.get('HELICONE_API_KEY')
+
+response = requests.post(
+    'https://api.helicone.ai/v1/request/query',
+    headers={
+        'Authorization': f'Bearer {HELICONE_API_KEY}',
+        'Content-Type': 'application/json',
+    },
+    json={
+        'filter': {},
+        'limit': 10,
+        'offset': 0,
+    }
+)
+
+data = response.json()
+```
+
+### cURL
+
+```bash
+export HELICONE_API_KEY="your-api-key-here"
+
+curl https://api.helicone.ai/v1/request/query \
+  -X POST \
+  -H "Authorization: Bearer $HELICONE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {},
+    "limit": 10,
+    "offset": 0
+  }'
+```
+
+## Security Best Practices
+
+<AccordionGroup>
+  <Accordion title="Store keys securely">
+    - Use environment variables or secret management services
+    - Never hardcode API keys in your source code
+    - Don't commit `.env` files to version control
+  </Accordion>
+  
+  <Accordion title="Rotate keys regularly">
+    - Create new API keys periodically
+    - Delete old or unused keys
+    - Update your applications when rotating keys
+  </Accordion>
+  
+  <Accordion title="Use minimal permissions">
+    - Create separate keys for different use cases
+    - Use read-only keys for analytics dashboards
+    - Use write-only keys for logging services
+  </Accordion>
+  
+  <Accordion title="Monitor key usage">
+    - Review API key activity regularly
+    - Set up alerts for unusual patterns
+    - Immediately revoke compromised keys
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+### 401 Unauthorized Error
+
+If you receive a 401 error:
+
+1. Verify your API key is correct
+2. Ensure you're using `Bearer` prefix in the Authorization header
+3. Check that your API key hasn't been deleted or revoked
+4. Confirm your key has the required permissions for the endpoint
+
+### Invalid Token Format
+
+If you see "API Key is not well formed":
+
+1. Check that your API key matches the expected format
+2. Ensure there are no extra spaces or characters
+3. Verify you copied the entire key
+
+## Managing API Keys
+
+You can manage your API keys programmatically:
+
+### List API Keys
+
+```bash
+curl https://api.helicone.ai/v1/api-keys \
+  -H "Authorization: Bearer YOUR_HELICONE_API_KEY"
+```
+
+### Create API Key
+
+```bash
+curl https://api.helicone.ai/v1/api-keys \
+  -X POST \
+  -H "Authorization: Bearer YOUR_HELICONE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "api_key_name": "Production Key",
+    "key_permissions": "rw"
+  }'
+```
+
+### Delete API Key
+
+```bash
+curl https://api.helicone.ai/v1/api-keys/{apiKeyId} \
+  -X DELETE \
+  -H "Authorization: Bearer YOUR_HELICONE_API_KEY"
+```
+
+<Note>
+When you create an API key, save it immediately. For security reasons, you won't be able to view the full key again.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Overview" icon="book" href="/api/introduction">
+    Learn about the API structure and response formats
+  </Card>
+  <Card title="Request Endpoints" icon="database" href="/api-reference/introduction">
+    Explore available API endpoints
+  </Card>
+</CardGroup>

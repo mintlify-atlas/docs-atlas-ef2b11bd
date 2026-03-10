@@ -1,0 +1,243 @@
+---
+title: "AI Gateway Overview"
+description: "Access 100+ AI models through one unified API with intelligent routing, automatic fallbacks, and unified observability"
+---
+
+## What is Helicone AI Gateway?
+
+Helicone AI Gateway is a unified inference platform that provides access to 100+ AI models from multiple providers through a single OpenAI-compatible API. Simply change your `baseURL` to start using models from OpenAI, Anthropic, Google, Meta, and dozens of other providers.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/gateway/getting-started">
+    Get started in 2 minutes with one line of code
+  </Card>
+  <Card title="Routing" icon="route" href="/gateway/routing">
+    Intelligent routing across providers
+  </Card>
+  <Card title="Fallbacks" icon="shield" href="/gateway/fallbacks">
+    Automatic failover for reliability
+  </Card>
+  <Card title="Integrations" icon="plug" href="/gateway/integrations">
+    Works with your existing tools
+  </Card>
+</CardGroup>
+
+## Key Features
+
+<AccordionGroup>
+  <Accordion title="Unified API" icon="layer-group">
+    Access models from 20+ providers using the OpenAI API format. No need to learn multiple SDKs or API formats.
+    
+    ```typescript
+    // Same API for all providers
+    const response = await client.chat.completions.create({
+      model: "claude-sonnet-4",  // or gpt-4o, gemini-2.0-flash, llama-3.3-70b
+      messages: [{ role: "user", content: "Hello!" }]
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Intelligent Routing" icon="arrows-split-up-and-left">
+    Automatically route requests to the best available provider based on:
+    - Cost optimization
+    - Latency requirements
+    - Provider availability
+    - Your BYOK (Bring Your Own Key) preferences
+    
+    Learn more in [Routing](/gateway/routing).
+  </Accordion>
+
+  <Accordion title="Automatic Fallbacks" icon="rotate">
+    Built-in resilience with automatic failover when a provider fails:
+    
+    ```typescript
+    // Tries Bedrock first, falls back to Anthropic
+    model: "claude-3-7-sonnet-20250219/bedrock,claude-3-7-sonnet-20250219/anthropic"
+    ```
+    
+    Learn more in [Fallbacks](/gateway/fallbacks).
+  </Accordion>
+
+  <Accordion title="Cost Tracking" icon="dollar-sign">
+    Unified cost tracking across all providers with accurate pricing for 300+ models.
+  </Accordion>
+
+  <Accordion title="Unified Observability" icon="chart-line">
+    Single dashboard to monitor requests across all providers with traces, logs, and analytics.
+  </Accordion>
+</AccordionGroup>
+
+## Supported Providers
+
+The AI Gateway supports 20+ inference providers:
+
+<CardGroup cols={3}>
+  <Card title="OpenAI" icon="openai">
+    GPT-4o, GPT-5, o1, o3, o4
+  </Card>
+  <Card title="Anthropic" icon="a">
+    Claude 3.7 Sonnet, Claude 4
+  </Card>
+  <Card title="Google" icon="google">
+    Gemini 2.0 Flash, Gemini 3
+  </Card>
+  <Card title="Meta" icon="meta">
+    Llama 3.3, Llama 4
+  </Card>
+  <Card title="AWS Bedrock" icon="aws">
+    All Bedrock models
+  </Card>
+  <Card title="Google Vertex" icon="google">
+    Vertex AI models
+  </Card>
+  <Card title="DeepSeek" icon="code">
+    DeepSeek models
+  </Card>
+  <Card title="Mistral" icon="wind">
+    Mistral models
+  </Card>
+  <Card title="xAI" icon="x-twitter">
+    Grok models
+  </Card>
+  <Card title="Groq" icon="bolt">
+    Fast inference
+  </Card>
+  <Card title="DeepInfra" icon="server">
+    100+ models
+  </Card>
+  <Card title="OpenRouter" icon="route">
+    Multi-provider routing
+  </Card>
+</CardGroup>
+
+<Info>
+View the complete list of supported models and providers at [helicone.ai/models](https://www.helicone.ai/models)
+</Info>
+
+## How It Works
+
+<Steps>
+  <Step title="Change Your Base URL">
+    Update your API client to point to Helicone's AI Gateway:
+    
+    ```typescript
+    const client = new OpenAI({
+      baseURL: "https://ai-gateway.helicone.ai",
+      apiKey: process.env.HELICONE_API_KEY,
+    });
+    ```
+  </Step>
+
+  <Step title="Specify Models">
+    Use model names directly or specify providers:
+    
+    ```typescript
+    // Auto-routing across providers
+    model: "gpt-4o-mini"
+    
+    // Specific provider
+    model: "claude-sonnet-4/anthropic"
+    
+    // With fallback
+    model: "gpt-4o/openai,gpt-4o/azure"
+    ```
+  </Step>
+
+  <Step title="Make Requests">
+    Use the standard OpenAI API format for all requests:
+    
+    ```typescript
+    const response = await client.chat.completions.create({
+      model: "claude-sonnet-4",
+      messages: [{ role: "user", content: "Hello!" }]
+    });
+    ```
+  </Step>
+</Steps>
+
+## Authentication Options
+
+<Tabs>
+  <Tab title="Pass-Through Billing (PTB)">
+    Use Helicone's API key and pay through Helicone:
+    
+    ```typescript
+    const client = new OpenAI({
+      baseURL: "https://ai-gateway.helicone.ai",
+      apiKey: process.env.HELICONE_API_KEY,
+    });
+    ```
+    
+    **Benefits:**
+    - Single API key for all providers
+    - Consolidated billing
+    - No provider account setup needed
+    - Automatic credit management
+  </Tab>
+
+  <Tab title="Bring Your Own Key (BYOK)">
+    Use your own provider API keys:
+    
+    ```typescript
+    const client = new OpenAI({
+      baseURL: "https://ai-gateway.helicone.ai",
+      apiKey: process.env.HELICONE_API_KEY,
+    });
+    ```
+    
+    Then add your provider keys in the [Helicone dashboard](https://helicone.ai/settings/keys).
+    
+    **Benefits:**
+    - Use existing provider credits
+    - Direct billing from providers
+    - Priority support with BYOK attempts first
+  </Tab>
+</Tabs>
+
+## Model Discovery
+
+The AI Gateway provides an OpenAI-compatible `/v1/models` endpoint to discover available models:
+
+```bash
+curl https://ai-gateway.helicone.ai/v1/models \
+  -H "Authorization: Bearer $HELICONE_API_KEY"
+```
+
+<ResponseExample>
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "gpt-4o-mini",
+      "object": "model",
+      "created": 1716537600,
+      "owned_by": "openai"
+    },
+    {
+      "id": "claude-sonnet-4",
+      "object": "model",
+      "created": 1708560000,
+      "owned_by": "anthropic"
+    }
+  ]
+}
+```
+</ResponseExample>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Get Started" icon="play" href="/gateway/getting-started">
+    Start using the AI Gateway in 2 minutes
+  </Card>
+  <Card title="Learn Routing" icon="map" href="/gateway/routing">
+    Understand how requests are routed
+  </Card>
+  <Card title="Configure Fallbacks" icon="shield-check" href="/gateway/fallbacks">
+    Set up automatic failover
+  </Card>
+  <Card title="Browse Models" icon="grid" href="https://www.helicone.ai/models">
+    Explore 300+ available models
+  </Card>
+</CardGroup>

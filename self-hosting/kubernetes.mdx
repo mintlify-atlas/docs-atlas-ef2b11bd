@@ -1,0 +1,584 @@
+---
+title: 'Kubernetes Deployment'
+description: 'Deploy Helicone to Kubernetes using Helm charts'
+icon: 'dharmachakra'
+---
+
+## Overview
+
+For production workloads, Helicone provides a production-ready Helm chart that deploys all services to Kubernetes with:
+
+- Horizontal auto-scaling
+- High availability
+- Resource management
+- Service discovery
+- Rolling updates
+- Health checks and probes
+
+## Prerequisites
+
+- Kubernetes 1.24 or later
+- Helm 3.8 or later
+- kubectl configured to access your cluster
+- 16GB+ memory across nodes
+- 100GB+ storage (persistent volumes)
+
+## Getting the Helm Chart
+
+The Helm chart is available for enterprise customers. Contact us to get access:
+
+<Card title="Get Enterprise Access" icon="envelope" href="mailto:enterprise@helicone.ai">
+  Email **enterprise@helicone.ai** to request the Helm chart and production support
+</Card>
+
+## Quick Start
+
+Once you have access to the Helm chart:
+
+<Steps>
+  <Step title="Add the Helm repository">
+    ```bash
+    helm repo add helicone https://charts.helicone.ai
+    helm repo update
+    ```
+  </Step>
+  
+  <Step title="Create a namespace">
+    ```bash
+    kubectl create namespace helicone
+    ```
+  </Step>
+  
+  <Step title="Configure values">
+    Create a `values.yaml` file with your configuration:
+    
+    ```yaml
+    # values.yaml
+    global:
+      domain: helicone.your-domain.com
+      
+    auth:
+      secret: "your-secure-random-secret-key"
+      
+    postgresql:
+      enabled: true
+      auth:
+        password: "secure-postgres-password"
+      primary:
+        persistence:
+          size: 100Gi
+          
+    clickhouse:
+      enabled: true
+      persistence:
+        size: 500Gi
+        
+    minio:
+      enabled: true
+      auth:
+        rootUser: admin
+        rootPassword: "secure-minio-password"
+      persistence:
+        size: 1Ti
+        
+    jawn:
+      replicaCount: 3
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+          
+    web:
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+    ```
+  </Step>
+  
+  <Step title="Install Helicone">
+    ```bash
+    helm install helicone helicone/helicone \
+      -n helicone \
+      -f values.yaml
+    ```
+  </Step>
+  
+  <Step title="Verify installation">
+    ```bash
+    # Check pod status
+    kubectl get pods -n helicone
+    
+    # Check services
+    kubectl get svc -n helicone
+    
+    # View logs
+    kubectl logs -n helicone -l app=jawn -f
+    ```
+  </Step>
+</Steps>
+
+## Architecture on Kubernetes
+
+Helicone deploys the following workloads:
+
+```
+┌─────────────────────────────────────────────────────┐
+│                   Ingress / Load Balancer            │
+│                 (helicone.your-domain.com)           │
+└──────────────┬────────────────────┬─────────────────┘
+               │                    │
+         ┌─────▼──────┐      ┌─────▼─────┐
+         │    Web     │      │   Jawn    │
+         │ (Next.js)  │      │  (API)    │
+         │ 2 replicas │      │ 3 replicas│
+         └─────┬──────┘      └─────┬─────┘
+               │                    │
+         ┌─────▼────────────────────▼─────┐
+         │                                 │
+    ┌────▼────┐  ┌──────────┐  ┌─────────▼──┐
+    │PostgreSQL│  │ClickHouse│  │   MinIO    │
+    │StatefulSet│ │StatefulSet│ │StatefulSet │
+    │(Primary +│  │(Cluster) │  │ (Cluster)  │
+    │ Replica) │  │          │  │            │
+    └──────────┘  └──────────┘  └────────────┘
+         │              │              │
+    ┌────▼────┐   ┌─────▼────┐  ┌─────▼────┐
+    │ PV: 100G│   │ PV: 500G │  │ PV: 1TB  │
+    └─────────┘   └──────────┘  └──────────┘
+```
+
+## Configuration Reference
+
+### Global Settings
+
+```yaml
+global:
+  # Domain for ingress
+  domain: helicone.example.com
+  
+  # Image registry (optional)
+  imageRegistry: docker.io
+  
+  # Storage class for PVCs
+  storageClass: "fast-ssd"
+```
+
+### Authentication
+
+```yaml
+auth:
+  # Secret key for session encryption (REQUIRED)
+  secret: "change-me-to-random-32-char-string"
+  
+  # Existing secret (optional)
+  existingSecret: "helicone-auth-secret"
+  existingSecretKey: "auth-secret"
+```
+
+### PostgreSQL (Application Database)
+
+```yaml
+postgresql:
+  enabled: true  # Set to false to use external database
+  
+  auth:
+    username: postgres
+    password: "secure-password"
+    database: helicone
+  
+  primary:
+    persistence:
+      enabled: true
+      size: 100Gi
+      storageClass: "fast-ssd"
+    
+    resources:
+      requests:
+        cpu: 2000m
+        memory: 4Gi
+      limits:
+        cpu: 4000m
+        memory: 8Gi
+  
+  # External database configuration
+  external:
+    host: postgres.external.com
+    port: 5432
+    database: helicone
+    username: helicone_user
+    password: "password"
+```
+
+### ClickHouse (Analytics Database)
+
+```yaml
+clickhouse:
+  enabled: true  # Set to false to use external ClickHouse
+  
+  persistence:
+    enabled: true
+    size: 500Gi
+    storageClass: "fast-ssd"
+  
+  resources:
+    requests:
+      cpu: 4000m
+      memory: 8Gi
+    limits:
+      cpu: 8000m
+      memory: 16Gi
+  
+  # Replication (for HA)
+  replicaCount: 3
+  
+  # External ClickHouse
+  external:
+    host: clickhouse.external.com
+    port: 8123
+    user: default
+    password: ""
+```
+
+### MinIO (Object Storage)
+
+```yaml
+minio:
+  enabled: true  # Set to false to use S3/GCS
+  
+  auth:
+    rootUser: admin
+    rootPassword: "secure-password"
+  
+  persistence:
+    enabled: true
+    size: 1Ti
+    storageClass: "standard"
+  
+  # For HA setup
+  mode: distributed
+  replicaCount: 4
+  
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+# Or use external S3-compatible storage
+s3:
+  endpoint: https://s3.amazonaws.com
+  region: us-east-1
+  bucket: helicone-storage
+  accessKeyId: "AKIA..."
+  secretAccessKey: "secret..."
+```
+
+### Jawn (Backend API)
+
+```yaml
+jawn:
+  replicaCount: 3
+  
+  image:
+    repository: helicone/jawn
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  
+  env:
+    LOG_LEVEL: info
+    NODE_ENV: production
+```
+
+### Web (Frontend)
+
+```yaml
+web:
+  replicaCount: 2
+  
+  image:
+    repository: helicone/web
+    tag: latest
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+```
+
+### Ingress
+
+```yaml
+ingress:
+  enabled: true
+  className: nginx  # or 'traefik', 'alb', etc.
+  
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  
+  hosts:
+    - host: helicone.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: web
+        - path: /v1
+          pathType: Prefix
+          service: jawn
+  
+  tls:
+    - secretName: helicone-tls
+      hosts:
+        - helicone.example.com
+```
+
+## Using External Managed Services
+
+For production, we recommend using managed services:
+
+### AWS Example
+
+```yaml
+# Disable bundled databases
+postgresql:
+  enabled: false
+  external:
+    host: helicone.abc123.us-east-1.rds.amazonaws.com
+    port: 5432
+    database: helicone
+    username: helicone
+    password: "${POSTGRES_PASSWORD}"  # Use secret
+
+clickhouse:
+  enabled: false
+  external:
+    host: clickhouse.abc123.us-east-1.amazonaws.com
+    port: 8443
+    secure: true
+
+minio:
+  enabled: false
+
+s3:
+  endpoint: https://s3.us-east-1.amazonaws.com
+  region: us-east-1
+  bucket: helicone-prod-storage
+  accessKeyId: "${AWS_ACCESS_KEY_ID}"
+  secretAccessKey: "${AWS_SECRET_ACCESS_KEY}"
+```
+
+## Monitoring and Observability
+
+The Helm chart includes Prometheus metrics and health checks:
+
+```yaml
+monitoring:
+  enabled: true
+  
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring
+  
+  grafana:
+    enabled: true
+    dashboards:
+      enabled: true
+```
+
+### Available Metrics
+
+- Request latency (p50, p95, p99)
+- Request volume
+- Error rates
+- Database connection pools
+- Cache hit rates
+
+## Backup and Disaster Recovery
+
+### PostgreSQL Backups
+
+```yaml
+postgresql:
+  backup:
+    enabled: true
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    retention: 30  # Keep 30 days
+    destination: s3://helicone-backups/postgres
+```
+
+### ClickHouse Backups
+
+```yaml
+clickhouse:
+  backup:
+    enabled: true
+    schedule: "0 3 * * *"
+    retention: 7
+    destination: s3://helicone-backups/clickhouse
+```
+
+## Scaling
+
+### Manual Scaling
+
+```bash
+# Scale Jawn replicas
+kubectl scale deployment/helicone-jawn -n helicone --replicas=5
+
+# Scale Web replicas
+kubectl scale deployment/helicone-web -n helicone --replicas=3
+```
+
+### Auto-Scaling
+
+HPA (Horizontal Pod Autoscaler) is configured in values.yaml:
+
+```yaml
+jawn:
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 20
+    metrics:
+      - type: Resource
+        resource:
+          name: cpu
+          target:
+            type: Utilization
+            averageUtilization: 70
+      - type: Resource
+        resource:
+          name: memory
+          target:
+            type: Utilization
+            averageUtilization: 80
+```
+
+## Upgrading
+
+```bash
+# Update Helm repo
+helm repo update
+
+# Check what will change
+helm diff upgrade helicone helicone/helicone \
+  -n helicone \
+  -f values.yaml
+
+# Perform upgrade
+helm upgrade helicone helicone/helicone \
+  -n helicone \
+  -f values.yaml \
+  --wait
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Pods not starting">
+    Check pod events and logs:
+    ```bash
+    kubectl describe pod -n helicone <pod-name>
+    kubectl logs -n helicone <pod-name> --previous
+    ```
+  </Accordion>
+  
+  <Accordion title="Database connection errors">
+    Verify database connectivity:
+    ```bash
+    # Test from a debug pod
+    kubectl run -it --rm debug --image=postgres:17 -n helicone -- \
+      psql -h helicone-postgresql -U postgres
+    ```
+  </Accordion>
+  
+  <Accordion title="PVC mounting issues">
+    Check storage class and PVC status:
+    ```bash
+    kubectl get pvc -n helicone
+    kubectl describe pvc -n helicone <pvc-name>
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Production Checklist
+
+<Steps>
+  <Step title="Security">
+    - [ ] Changed all default passwords
+    - [ ] Configured TLS/SSL certificates
+    - [ ] Set up network policies
+    - [ ] Enabled pod security policies
+    - [ ] Configured RBAC
+  </Step>
+  
+  <Step title="High Availability">
+    - [ ] Multiple replicas for stateless services
+    - [ ] Database replication configured
+    - [ ] Anti-affinity rules set
+    - [ ] PodDisruptionBudgets configured
+  </Step>
+  
+  <Step title="Monitoring">
+    - [ ] Prometheus metrics enabled
+    - [ ] Grafana dashboards imported
+    - [ ] Alerts configured
+    - [ ] Log aggregation set up
+  </Step>
+  
+  <Step title="Backup">
+    - [ ] Automated backups configured
+    - [ ] Backup restoration tested
+    - [ ] Retention policies set
+  </Step>
+  
+  <Step title="Performance">
+    - [ ] Resource limits configured
+    - [ ] Auto-scaling enabled
+    - [ ] PersistentVolume performance tested
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/self-hosting/architecture">
+    Understand the system architecture
+  </Card>
+  <Card title="Enterprise Support" icon="headset" href="mailto:enterprise@helicone.ai">
+    Get help with your production deployment
+  </Card>
+</CardGroup>

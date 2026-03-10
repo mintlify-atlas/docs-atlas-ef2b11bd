@@ -1,0 +1,405 @@
+---
+title: "Getting Started"
+description: "Start using Helicone AI Gateway in 2 minutes"
+---
+
+## Quick Start
+
+Get started with Helicone AI Gateway in three simple steps:
+
+<Steps>
+  <Step title="Get Your API Key">
+    Sign up at [helicone.ai/signup](https://helicone.ai/signup) and get your API key from the dashboard.
+    
+    <Note>
+    If using Pass-Through Billing, add credits at [helicone.ai/credits](https://us.helicone.ai/credits)
+    </Note>
+  </Step>
+
+  <Step title="Update Your Code">
+    Change your `baseURL` to point to Helicone's AI Gateway:
+    
+    ```typescript
+    import OpenAI from "openai";
+
+    const client = new OpenAI({
+      baseURL: "https://ai-gateway.helicone.ai",
+      apiKey: process.env.HELICONE_API_KEY,
+    });
+    ```
+  </Step>
+
+  <Step title="Make Requests">
+    Use any model from 20+ providers:
+    
+    ```typescript
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",  // or claude-sonnet-4, gemini-2.0-flash, etc.
+      messages: [{ role: "user", content: "Hello!" }]
+    });
+    ```
+  </Step>
+</Steps>
+
+<Check>
+You're all set! View your requests at [helicone.ai/dashboard](https://us.helicone.ai/dashboard)
+</Check>
+
+## Examples by Language
+
+<Tabs>
+  <Tab title="TypeScript/Node.js">
+    ### OpenAI SDK
+    
+    ```typescript
+    import OpenAI from "openai";
+
+    const client = new OpenAI({
+      baseURL: "https://ai-gateway.helicone.ai",
+      apiKey: process.env.HELICONE_API_KEY,
+    });
+
+    async function main() {
+      const response = await client.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "user", content: "What is the capital of France?" }
+        ]
+      });
+      
+      console.log(response.choices[0].message.content);
+    }
+
+    main();
+    ```
+    
+    ### Anthropic SDK
+    
+    You can also use the Anthropic SDK directly with no format mapping:
+    
+    ```typescript
+    import Anthropic from "@anthropic-ai/sdk";
+
+    const client = new Anthropic({
+      apiKey: `Bearer ${process.env.HELICONE_API_KEY}`,
+      baseURL: "https://ai-gateway.helicone.ai",
+      defaultHeaders: {
+        "Helicone-Gateway-Body-Mapping": "NO_MAPPING",
+      },
+    });
+
+    const response = await client.messages.create({
+      model: "claude-3-7-sonnet-20250219/anthropic",
+      max_tokens: 100,
+      messages: [{ role: "user", content: "Hello!" }],
+    });
+    ```
+  </Tab>
+
+  <Tab title="Python">
+    ### OpenAI SDK
+    
+    ```python
+    from openai import OpenAI
+
+    client = OpenAI(
+        base_url="https://ai-gateway.helicone.ai",
+        api_key=os.getenv("HELICONE_API_KEY"),
+    )
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "user", "content": "What is the capital of France?"}
+        ],
+    )
+
+    print(response.choices[0].message.content)
+    ```
+    
+    ### Anthropic SDK
+    
+    ```python
+    from anthropic import Anthropic
+
+    client = Anthropic(
+        api_key=f"Bearer {os.getenv('HELICONE_API_KEY')}",
+        base_url="https://ai-gateway.helicone.ai",
+        default_headers={
+            "Helicone-Gateway-Body-Mapping": "NO_MAPPING",
+        },
+    )
+
+    response = client.messages.create(
+        model="claude-3-7-sonnet-20250219/anthropic",
+        max_tokens=100,
+        messages=[{"role": "user", "content": "Hello!"}],
+    )
+    ```
+  </Tab>
+
+  <Tab title="cURL">
+    ### Basic Request
+    
+    ```bash
+    curl https://ai-gateway.helicone.ai/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $HELICONE_API_KEY" \
+      -d '{
+        "model": "gpt-4o-mini",
+        "messages": [
+          {"role": "user", "content": "What is the capital of France?"}
+        ]
+      }'
+    ```
+    
+    ### With Fallback
+    
+    ```bash
+    curl https://ai-gateway.helicone.ai/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $HELICONE_API_KEY" \
+      -d '{
+        "model": "gpt-4o/openai,gpt-4o/azure",
+        "messages": [
+          {"role": "user", "content": "Hello!"}
+        ]
+      }'
+    ```
+  </Tab>
+</Tabs>
+
+## Authentication Methods
+
+### Pass-Through Billing (PTB)
+
+Use Helicone's API key and billing for all providers:
+
+```typescript
+const client = new OpenAI({
+  baseURL: "https://ai-gateway.helicone.ai",
+  apiKey: process.env.HELICONE_API_KEY,
+});
+```
+
+**Requirements:**
+- Helicone API key
+- Credits added to your account ([add credits](https://us.helicone.ai/credits))
+
+**Benefits:**
+- Single API key for all providers
+- Consolidated billing
+- No provider setup needed
+
+### Bring Your Own Key (BYOK)
+
+Use your own provider API keys with Helicone:
+
+<Steps>
+  <Step title="Add Provider Keys">
+    Go to [Settings → API Keys](https://helicone.ai/settings/keys) and add your provider keys:
+    
+    - OpenAI API key
+    - Anthropic API key
+    - Google API key
+    - AWS credentials (for Bedrock)
+    - Other provider keys
+  </Step>
+
+  <Step title="Use Helicone API Key">
+    Your requests automatically use BYOK when available:
+    
+    ```typescript
+    const client = new OpenAI({
+      baseURL: "https://ai-gateway.helicone.ai",
+      apiKey: process.env.HELICONE_API_KEY,
+    });
+    ```
+  </Step>
+</Steps>
+
+**Benefits:**
+- Use existing provider credits
+- Direct provider billing
+- BYOK attempts prioritized over PTB
+- Automatic fallback to PTB if BYOK fails
+
+<Info>
+The AI Gateway automatically prioritizes BYOK over PTB attempts. Learn more in [Routing](/gateway/routing).
+</Info>
+
+## Model Formats
+
+The AI Gateway supports multiple model naming formats:
+
+<Tabs>
+  <Tab title="Model Only">
+    Specify just the model name for automatic provider routing:
+    
+    ```typescript
+    model: "gpt-4o-mini"  // Routes to best available provider
+    ```
+    
+    The gateway automatically:
+    - Tries BYOK providers first
+    - Falls back to PTB if needed
+    - Selects based on cost and availability
+  </Tab>
+
+  <Tab title="Model with Provider">
+    Specify both model and provider for explicit routing:
+    
+    ```typescript
+    model: "gpt-4o/openai"              // OpenAI directly
+    model: "gpt-4o/azure"               // Azure OpenAI
+    model: "claude-sonnet-4/anthropic"  // Anthropic direct
+    model: "claude-sonnet-4/bedrock"    // AWS Bedrock
+    ```
+  </Tab>
+
+  <Tab title="With Fallbacks">
+    Use comma-separated models for automatic fallback:
+    
+    ```typescript
+    // Try Bedrock first, fallback to Anthropic
+    model: "claude-3-7-sonnet-20250219/bedrock,claude-3-7-sonnet-20250219/anthropic"
+    
+    // Try OpenAI, fallback to Azure, then DeepInfra
+    model: "gpt-4o/openai,gpt-4o/azure,gpt-4o/deepinfra"
+    ```
+    
+    Learn more in [Fallbacks](/gateway/fallbacks).
+  </Tab>
+
+  <Tab title="With Provider Exclusions">
+    Exclude specific providers from automatic routing:
+    
+    ```typescript
+    // Use any provider except Anthropic
+    model: "!anthropic,gpt-4o-mini"
+    
+    // Exclude multiple providers
+    model: "!anthropic,!deepinfra,gpt-4o-mini"
+    ```
+    
+    The `!` prefix excludes providers globally for all models in the request.
+  </Tab>
+</Tabs>
+
+## Discovering Models
+
+Use the `/v1/models` endpoint to discover available models:
+
+```bash
+curl https://ai-gateway.helicone.ai/v1/models \
+  -H "Authorization: Bearer $HELICONE_API_KEY"
+```
+
+<ResponseExample>
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "gpt-4o-mini",
+      "object": "model",
+      "created": 1716537600,
+      "owned_by": "openai"
+    },
+    {
+      "id": "claude-sonnet-4",
+      "object": "model",
+      "created": 1708560000,
+      "owned_by": "anthropic"
+    }
+  ]
+}
+```
+</ResponseExample>
+
+Or browse all models at [helicone.ai/models](https://www.helicone.ai/models).
+
+## Configuration Headers
+
+Customize gateway behavior with optional headers:
+
+<ParamField header="Helicone-Gateway-Body-Mapping" type="string" default="OPENAI">
+  Control request/response format mapping:
+  - `OPENAI`: Map to OpenAI format (default)
+  - `RESPONSES`: Use OpenAI Responses API format
+  - `NO_MAPPING`: Pass through native provider format
+</ParamField>
+
+<ParamField header="X-Stripe-Customer-Id" type="string">
+  Associate requests with a Stripe customer for metering
+</ParamField>
+
+### Example with Headers
+
+```typescript
+const client = new OpenAI({
+  baseURL: "https://ai-gateway.helicone.ai",
+  apiKey: process.env.HELICONE_API_KEY,
+  defaultHeaders: {
+    "Helicone-Gateway-Body-Mapping": "NO_MAPPING",
+  },
+});
+```
+
+## Streaming Responses
+
+Streaming works the same as with native providers:
+
+```typescript
+const stream = await client.chat.completions.create({
+  model: "gpt-4o-mini",
+  messages: [{ role: "user", content: "Tell me a story" }],
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0]?.delta?.content || "");
+}
+```
+
+## Error Handling
+
+The gateway returns standard OpenAI-compatible error responses:
+
+```typescript
+try {
+  const response = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Hello!" }],
+  });
+} catch (error) {
+  if (error.status === 401) {
+    console.error("Invalid API key");
+  } else if (error.status === 429) {
+    console.error("Rate limit exceeded or insufficient credits");
+  } else if (error.status === 400) {
+    console.error("Bad request:", error.message);
+  }
+}
+```
+
+<Tip>
+Enable fallbacks to automatically retry with different providers on errors. See [Fallbacks](/gateway/fallbacks).
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Routing" icon="route" href="/gateway/routing">
+    Learn how requests are routed across providers
+  </Card>
+  <Card title="Fallbacks" icon="shield" href="/gateway/fallbacks">
+    Configure automatic failover for reliability
+  </Card>
+  <Card title="Prompt Integration" icon="wand-magic-sparkles" href="/gateway/prompt-integration">
+    Use prompts stored in Helicone
+  </Card>
+  <Card title="Integrations" icon="puzzle-piece" href="/gateway/integrations">
+    Integrate with frameworks and tools
+  </Card>
+</CardGroup>

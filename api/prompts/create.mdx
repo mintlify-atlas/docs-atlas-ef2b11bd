@@ -1,0 +1,212 @@
+---
+title: 'Create Prompt'
+api: 'POST /v1/prompt-2025'
+description: 'Create a new prompt with initial version'
+---
+
+Creates a new prompt template with an initial version. The prompt body uses the OpenAI chat format.
+
+## Request Body
+
+<ParamField body="name" type="string" required>
+  Name of the prompt template
+</ParamField>
+
+<ParamField body="tags" type="string[]" required>
+  Array of tags to categorize the prompt
+</ParamField>
+
+<ParamField body="promptBody" type="object" required>
+  The prompt content in OpenAI chat format
+  
+  <Expandable title="Prompt Body">
+    <ParamField body="model" type="string">
+      The model to use (e.g., "gpt-4o", "claude-3-sonnet-20240229")
+    </ParamField>
+    
+    <ParamField body="messages" type="array">
+      Array of message objects
+      
+      <Expandable title="Message Object">
+        <ParamField body="role" type="string" required>
+          Message role: "system", "user", "assistant", "developer", "tool", or "function"
+        </ParamField>
+        
+        <ParamField body="content" type="string | array | null" required>
+          Message content. Can be:
+          - A string for simple text messages
+          - An array of content parts for multi-modal messages
+          - null for certain message types
+        </ParamField>
+        
+        <ParamField body="name" type="string">
+          Optional name for the message
+        </ParamField>
+        
+        <ParamField body="tool_call_id" type="string">
+          Required for tool messages
+        </ParamField>
+        
+        <ParamField body="tool_calls" type="array">
+          Tool calls made by the assistant
+        </ParamField>
+      </Expandable>
+    </ParamField>
+    
+    <ParamField body="temperature" type="number">
+      Sampling temperature (0-2)
+    </ParamField>
+    
+    <ParamField body="top_p" type="number">
+      Nucleus sampling parameter
+    </ParamField>
+    
+    <ParamField body="max_tokens" type="number">
+      Maximum tokens to generate
+    </ParamField>
+    
+    <ParamField body="tools" type="array">
+      Array of tool/function definitions
+      
+      <Expandable title="Tool Object">
+        <ParamField body="type" type="string">
+          Must be "function"
+        </ParamField>
+        
+        <ParamField body="function" type="object">
+          Function definition with name, description, and parameters
+        </ParamField>
+      </Expandable>
+    </ParamField>
+    
+    <ParamField body="tool_choice" type="string | object">
+      Controls which tool to call: "auto", "none", or specific tool
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="data" type="object">
+  <ResponseField name="id" type="string">
+    The unique identifier for the created prompt
+  </ResponseField>
+  
+  <ResponseField name="versionId" type="string">
+    The unique identifier for the initial version
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="error" type="string | null">
+  Error message if the request failed, null otherwise
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.helicone.ai/v1/prompt-2025 \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Customer Support Agent",
+    "tags": ["support", "customer-service"],
+    "promptBody": {
+      "model": "gpt-4o",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful customer support agent. Be polite and professional."
+        },
+        {
+          "role": "user",
+          "content": "{{user_question}}"
+        }
+      ],
+      "temperature": 0.7,
+      "max_tokens": 500
+    }
+  }'
+```
+
+```typescript TypeScript
+const response = await fetch('https://api.helicone.ai/v1/prompt-2025', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    name: 'Customer Support Agent',
+    tags: ['support', 'customer-service'],
+    promptBody: {
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a helpful customer support agent. Be polite and professional.',
+        },
+        {
+          role: 'user',
+          content: '{{user_question}}',
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 500,
+    },
+  }),
+});
+
+const result = await response.json();
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    'https://api.helicone.ai/v1/prompt-2025',
+    headers={
+        'Authorization': 'Bearer YOUR_API_KEY',
+        'Content-Type': 'application/json',
+    },
+    json={
+        'name': 'Customer Support Agent',
+        'tags': ['support', 'customer-service'],
+        'promptBody': {
+            'model': 'gpt-4o',
+            'messages': [
+                {
+                    'role': 'system',
+                    'content': 'You are a helpful customer support agent. Be polite and professional.',
+                },
+                {
+                    'role': 'user',
+                    'content': '{{user_question}}',
+                },
+            ],
+            'temperature': 0.7,
+            'max_tokens': 500,
+        },
+    },
+)
+
+result = response.json()
+```
+</RequestExample>
+
+<ResponseExample>
+```json 201 Success
+{
+  "data": {
+    "id": "prompt_abc123xyz",
+    "versionId": "version_def456uvw"
+  },
+  "error": null
+}
+```
+
+```json 500 Error
+{
+  "data": null,
+  "error": "Failed to create prompt"
+}
+```
+</ResponseExample>

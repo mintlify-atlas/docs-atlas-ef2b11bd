@@ -1,0 +1,669 @@
+---
+title: "User Feedback"
+sidebarTitle: "Feedback"
+description: "Collect user satisfaction signals to understand and improve LLM response quality"
+---
+
+User Feedback lets you collect positive/negative ratings on LLM responses, enabling data-driven improvements to your AI systems based on actual user satisfaction. Combine explicit ratings with implicit behavioral signals to understand what really works.
+
+## Why Use User Feedback
+
+<CardGroup cols={2}>
+<Card title="Improve Response Quality" icon="star">
+  Identify patterns in poorly-rated responses to refine prompts and model selection
+</Card>
+<Card title="Catch Regressions Early" icon="shield-check">
+  Monitor feedback trends to detect when changes negatively impact user experience
+</Card>
+<Card title="Build Training Datasets" icon="database">
+  Use highly-rated responses as examples for fine-tuning or few-shot prompting
+</Card>
+<Card title="Understand Real Usage" icon="users">
+  Learn what users actually find helpful, not just what scores well in evaluations
+</Card>
+</CardGroup>
+
+## Quick Start
+
+<Steps>
+<Step title="Make a request and capture the ID">
+  Make your LLM request through Helicone with a custom request ID:
+
+  ```typescript
+  import OpenAI from "openai";
+  import { randomUUID } from "crypto";
+
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+    baseURL: "https://oai.helicone.ai/v1",
+    defaultHeaders: {
+      "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+    },
+  });
+
+  // Use custom ID for feedback tracking
+  const requestId = randomUUID();
+
+  const response = await openai.chat.completions.create(
+    {
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: "Explain quantum computing" }],
+    },
+    {
+      headers: { "Helicone-Request-Id": requestId },
+    }
+  );
+
+  // Store requestId to associate with feedback later
+  ```
+
+  <Accordion title="Alternative: Getting request ID from response">
+  You can also try to get the Helicone ID from response headers, though this may not always be available:
+
+  ```typescript
+  const heliconeId = response.response?.headers?.get("helicone-id");
+
+  if (!heliconeId) {
+    console.log("Helicone ID not found, use custom ID approach");
+  }
+  ```
+  </Accordion>
+</Step>
+
+<Step title="Show response to user">
+  Display the LLM response to your user with feedback UI:
+
+  ```typescript
+  // Show response with feedback buttons
+  return (
+    <div>
+      <div>{response.choices[0].message.content}</div>
+      <div>
+        <button onClick={() => submitFeedback(requestId, true)}>
+          👍 Helpful
+        </button>
+        <button onClick={() => submitFeedback(requestId, false)}>
+          👎 Not helpful
+        </button>
+      </div>
+    </div>
+  );
+  ```
+</Step>
+
+<Step title="Submit feedback rating">
+  Send user feedback to Helicone:
+
+  ```typescript
+  async function submitFeedback(requestId: string, isPositive: boolean) {
+    await fetch(
+      `https://api.helicone.ai/v1/request/${requestId}/feedback`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.HELICONE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          rating: isPositive  // true = positive, false = negative
+        }),
+      }
+    );
+  }
+  ```
+</Step>
+
+<Step title="View feedback analytics">
+  Access feedback metrics in your Helicone dashboard to analyze response quality trends and identify areas for improvement.
+</Step>
+</Steps>
+
+## API Format
+
+### Request Structure
+
+The feedback API expects this simple format:
+
+```typescript
+POST https://api.helicone.ai/v1/request/{requestId}/feedback
+
+{
+  "rating": boolean  // true = positive, false = negative
+}
+```
+
+### Parameters
+
+| Parameter | Type | Description | Example |
+|-----------|------|-------------|---------||
+| `rating` | `boolean` | User's feedback on the response | `true` (positive) or `false` (negative) |
+| `requestId` | `string` | Helicone request ID (in URL path) | `f47ac10b-58cc-4372-a567-0e02b2c3d479` |
+
+## Feedback Types
+
+### Explicit Feedback
+
+Direct user ratings through UI interactions:
+
+<Tabs>
+<Tab title="Thumbs Up/Down">
+```typescript
+// Simple thumbs up/down interface
+function FeedbackButtons({ requestId }: { requestId: string }) {
+  const [feedback, setFeedback] = useState<boolean | null>(null);
+
+  const handleFeedback = async (isPositive: boolean) => {
+    setFeedback(isPositive);
+    
+    await fetch(
+      `https://api.helicone.ai/v1/request/${requestId}/feedback`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${HELICONE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ rating: isPositive }),
+      }
+    );
+  };
+
+  return (
+    <div className="feedback-buttons">
+      <button
+        onClick={() => handleFeedback(true)}
+        disabled={feedback !== null}
+      >
+        👍 {feedback === true && "Thanks!"}
+      </button>
+      <button
+        onClick={() => handleFeedback(false)}
+        disabled={feedback !== null}
+      >
+        👎 {feedback === false && "We'll improve!"}
+      </button>
+    </div>
+  );
+}
+```
+</Tab>
+
+<Tab title="Star Ratings">
+```typescript
+// Convert star rating (1-5) to boolean
+function StarRating({ requestId }: { requestId: string }) {
+  const handleRating = async (stars: number) => {
+    // Consider 4-5 stars as positive, 1-3 as negative
+    const isPositive = stars >= 4;
+    
+    await fetch(
+      `https://api.helicone.ai/v1/request/${requestId}/feedback`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${HELICONE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ rating: isPositive }),
+      }
+    );
+
+    // Optionally submit star count as a score
+    await fetch(
+      `https://api.helicone.ai/v1/request/${requestId}/score`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${HELICONE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ scores: { star_rating: stars * 20 } }),
+      }
+    );
+  };
+
+  return (
+    <div>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button key={star} onClick={() => handleRating(star)}>
+          ⭐
+        </button>
+      ))}
+    </div>
+  );
+}
+```
+</Tab>
+
+<Tab title="Follow-up Question">
+```typescript
+// Ask for feedback only if user seems dissatisfied
+async function handleChatMessage(message: string, requestId: string) {
+  const response = await getLLMResponse(message, requestId);
+  
+  // Show response
+  displayMessage(response);
+  
+  // If user immediately asks for help again, they weren't satisfied
+  const nextMessage = await waitForNextMessage(timeout: 60000);
+  
+  if (nextMessage?.content.includes('actually') || 
+      nextMessage?.content.includes('that\'s wrong')) {
+    // Implicit negative feedback
+    await submitFeedback(requestId, false);
+  }
+}
+```
+</Tab>
+</Tabs>
+
+### Implicit Feedback
+
+**Implicit feedback is often more valuable than explicit ratings** because it reflects actual user behavior, not just their stated opinion. Most users don't click feedback buttons, but their actions reveal satisfaction.
+
+<Tabs>
+<Tab title="Code Acceptance (like Cursor)">
+```typescript
+// Track if user accepts/rejects code suggestions
+async function trackCodeCompletion(
+  requestId: string,
+  suggestion: string
+) {
+  // Monitor user action on the suggestion
+  const userAction = await waitForUserAction(suggestion);
+  
+  let isPositive = false;
+  
+  if (userAction.accepted) {
+    // User hit Tab/Enter to accept
+    isPositive = true;
+  } else if (userAction.modified) {
+    // User edited suggestion before accepting
+    isPositive = true;  // Still valuable
+  } else if (userAction.rejected) {
+    // User hit Escape or kept typing
+    isPositive = false;
+  }
+  
+  await fetch(
+    `https://api.helicone.ai/v1/request/${requestId}/feedback`,
+    {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${HELICONE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ rating: isPositive }),
+    }
+  );
+}
+```
+</Tab>
+
+<Tab title="Engagement Patterns">
+```typescript
+// Track user behavior after receiving response
+async function trackChatEngagement(
+  requestId: string,
+  response: string
+) {
+  // Monitor user behavior for 60 seconds
+  const behavior = await monitorUserBehavior(60000);
+  
+  // Positive signals
+  const positiveSignals = [
+    behavior.continuedConversation,  // Asked follow-up
+    behavior.copiedResponse,         // Copied the answer
+    behavior.sharedResponse,         // Shared/saved
+    behavior.clickedLinks,           // Engaged with links
+    behavior.timeSpent > 30          // Read for >30s
+  ];
+  
+  // Negative signals
+  const negativeSignals = [
+    behavior.immediatelyLeft,        // Closed chat quickly
+    behavior.askedSameQuestion,      // Re-asked same thing
+    behavior.requestedHuman,         // Asked for human help
+    behavior.timeSpent < 5           // Dismissed immediately
+  ];
+  
+  const positiveCount = positiveSignals.filter(Boolean).length;
+  const negativeCount = negativeSignals.filter(Boolean).length;
+  
+  // Submit feedback based on predominant signals
+  if (positiveCount > negativeCount) {
+    await submitFeedback(requestId, true);
+  } else if (negativeCount > positiveCount) {
+    await submitFeedback(requestId, false);
+  }
+}
+```
+</Tab>
+
+<Tab title="Search/Recommendation Clicks">
+```typescript
+// Track if user engages with search results or recommendations
+async function trackSearchResults(
+  requestId: string,
+  results: string[]
+) {
+  // Monitor user clicks on results for 5 minutes
+  const clicks = await trackClicks(results, timeout: 300000);
+  
+  // Calculate click-through rate
+  const ctr = clicks.length / results.length;
+  
+  // Positive feedback if user clicked any results
+  const isPositive = clicks.length > 0;
+  
+  await fetch(
+    `https://api.helicone.ai/v1/request/${requestId}/feedback`,
+    {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${HELICONE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ rating: isPositive }),
+    }
+  );
+  
+  // Also submit CTR as a score
+  await submitScore(requestId, { click_through_rate: Math.round(ctr * 100) });
+}
+```
+</Tab>
+
+<Tab title="Task Completion">
+```typescript
+// Track if user completed their intended task
+async function trackTaskCompletion(
+  requestId: string,
+  taskType: string
+) {
+  // Examples of task completion signals:
+  const completionSignals = {
+    'booking': await checkIfBookingCompleted(),
+    'purchase': await checkIfPurchaseCompleted(),
+    'form': await checkIfFormSubmitted(),
+    'search': await checkIfUserClickedResult(),
+    'support': await checkIfTicketResolved()
+  };
+  
+  const taskCompleted = completionSignals[taskType];
+  
+  // Successful task completion = positive feedback
+  await submitFeedback(requestId, taskCompleted);
+}
+```
+</Tab>
+</Tabs>
+
+## Integration Patterns
+
+### Chat Application
+
+Collect feedback in conversational interfaces:
+
+```typescript
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: "https://oai.helicone.ai/v1",
+  defaultHeaders: {
+    "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+  },
+});
+
+async function handleChatMessage(
+  userId: string,
+  message: string
+) {
+  const requestId = crypto.randomUUID();
+  
+  const response = await openai.chat.completions.create(
+    {
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You are a helpful assistant." },
+        { role: "user", content: message }
+      ]
+    },
+    {
+      headers: {
+        "Helicone-Request-Id": requestId,
+        "Helicone-User-Id": userId,
+        "Helicone-Property-Feature": "chat"
+      }
+    }
+  );
+
+  // Store mapping for later feedback
+  await storeRequestMapping(userId, requestId, response.id);
+  
+  return { response, requestId };
+}
+
+// When user provides feedback
+async function handleUserFeedback(
+  userId: string,
+  responseId: string,
+  isPositive: boolean
+) {
+  const requestId = await getRequestId(userId, responseId);
+  
+  await fetch(
+    `https://api.helicone.ai/v1/request/${requestId}/feedback`,
+    {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.HELICONE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ rating: isPositive }),
+    }
+  );
+}
+```
+
+### Support Bot
+
+Automate feedback collection based on ticket resolution:
+
+```typescript
+async function handleSupportQuery(
+  ticketId: string,
+  query: string
+) {
+  const requestId = `ticket-${ticketId}-${Date.now()}`;
+  
+  const response = await openai.chat.completions.create(
+    {
+      model: "gpt-4o-mini",
+      messages: [
+        { 
+          role: "system", 
+          content: "You are a technical support specialist." 
+        },
+        { role: "user", content: query }
+      ],
+      temperature: 0.3
+    },
+    {
+      headers: {
+        "Helicone-Auth": `Bearer ${HELICONE_API_KEY}`,
+        "Helicone-Request-Id": requestId,
+        "Helicone-Property-TicketId": ticketId
+      }
+    }
+  );
+
+  // Send response to user
+  await sendSupportResponse(ticketId, response.choices[0].message.content);
+  
+  // Follow up after 24 hours to check resolution
+  setTimeout(async () => {
+    const wasResolved = await checkIfTicketResolved(ticketId);
+    
+    await fetch(
+      `https://api.helicone.ai/v1/request/${requestId}/feedback`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${HELICONE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ rating: wasResolved }),
+      }
+    );
+  }, 24 * 60 * 60 * 1000);
+}
+```
+
+### Batch Feedback Submission
+
+Submit multiple feedback ratings efficiently:
+
+```typescript
+// Note: No bulk endpoint - use parallel requests
+const feedbackBatch = [
+  { requestId: "f47ac10b-58cc-4372-a567-0e02b2c3d479", rating: true },
+  { requestId: "6ba7b810-9dad-11d1-80b4-00c04fd430c8", rating: false },
+  { requestId: "6ba7b811-9dad-11d1-80b4-00c04fd430c8", rating: true }
+];
+
+// Submit in parallel for better performance
+const feedbackPromises = feedbackBatch.map(({ requestId, rating }) =>
+  fetch(`https://api.helicone.ai/v1/request/${requestId}/feedback`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${HELICONE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ rating }),
+  })
+);
+
+const results = await Promise.all(feedbackPromises);
+
+// Check for failures
+results.forEach((result, index) => {
+  if (!result.ok) {
+    console.error(
+      `Failed to submit feedback for ${feedbackBatch[index].requestId}`
+    );
+  }
+});
+```
+
+## Analyzing Feedback
+
+### Using Feedback to Build Datasets
+
+Create training datasets from highly-rated responses:
+
+```typescript
+// In Helicone dashboard:
+// 1. Navigate to Requests page
+// 2. Filter by: feedback = true AND scores.accuracy > 90
+// 3. Select all filtered requests
+// 4. Click "Add to Dataset"
+// 5. Export as JSONL for fine-tuning
+```
+
+### Combining Feedback with Scores
+
+Get comprehensive quality signals:
+
+```typescript
+async function evaluateAndGetFeedback(requestId: string, response: string) {
+  // Automated evaluation
+  const automatedScore = await evaluateResponse(response);
+  await fetch(`https://api.helicone.ai/v1/request/${requestId}/score`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${HELICONE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ scores: { quality: automatedScore } }),
+  });
+
+  // User feedback
+  const userLiked = await getUserFeedback();
+  await fetch(`https://api.helicone.ai/v1/request/${requestId}/feedback`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${HELICONE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ rating: userLiked }),
+  });
+
+  // Best examples: High automated score AND positive user feedback
+  // Filter in dashboard: scores.quality > 90 AND feedback = true
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+<Card title="Make It Easy" icon="mouse-pointer">
+  Place feedback buttons prominently and make them simple to use (one click)
+</Card>
+
+<Card title="Prefer Implicit" icon="eye">
+  Implicit signals (acceptance, engagement) are more reliable than explicit ratings
+</Card>
+
+<Card title="Don't Over-Ask" icon="volume-xmark">
+  Don't prompt for feedback on every response—only when it matters
+</Card>
+
+<Card title="Close the Loop" icon="arrows-rotate">
+  Show users that their feedback leads to improvements
+</Card>
+
+<Card title="Combine Signals" icon="layer-group">
+  Use both feedback AND automated scores for comprehensive quality assessment
+</Card>
+
+<Card title="Act on Negatives" icon="exclamation-triangle">
+  Immediately investigate and fix patterns in negative feedback
+</Card>
+</CardGroup>
+
+## API Reference
+
+### Key Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/request/{requestId}/feedback` | POST | Submit user feedback rating |
+| `/v1/session/{sessionId}/feedback` | POST | Submit feedback for entire session |
+
+[View full API documentation →](/rest/request/post-v1request-feedback)
+
+## Related Features
+
+<CardGroup cols={2}>
+<Card title="Datasets" icon="database" href="/evaluation/datasets">
+  Build training datasets from highly-rated responses
+</Card>
+
+<Card title="Scores" icon="star" href="/evaluation/scores">
+  Combine automated scores with user feedback for comprehensive quality assessment
+</Card>
+
+<Card title="Custom Properties" icon="tag" href="/features/advanced-usage/custom-properties">
+  Segment feedback by feature, user type, or experiment
+</Card>
+
+<Card title="User Metrics" icon="chart-line" href="/features/advanced-usage/user-metrics">
+  Track feedback trends per user or user segment
+</Card>
+</CardGroup>
+
+---
+
+User feedback provides real-world validation of LLM response quality. Start with simple thumbs up/down, then expand to implicit signals that reflect actual user satisfaction.

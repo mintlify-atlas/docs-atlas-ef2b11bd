@@ -1,0 +1,513 @@
+---
+title: "Agent Tracing & Observability"
+description: "Track complex agent workflows with sessions, tool calls, and decision paths for complete observability"
+sidebarTitle: "Agent Tracing"
+---
+
+AI agents make autonomous decisions, call tools, and chain multiple operations together. Tracing these workflows is essential for debugging, optimization, and understanding agent behavior.
+
+## What is Agent Tracing?
+
+Agent tracing captures the complete execution flow of autonomous AI agents:
+
+- **Decision points** - Which tools did the agent choose and why?
+- **Tool executions** - What parameters were used and what results returned?
+- **Multi-step reasoning** - How did the agent chain operations together?
+- **Error handling** - Where did failures occur and how were they recovered?
+
+<Frame caption="Session view showing complete agent workflow with tool calls and decision tree">
+  <img
+    src="/images/sessions/session-metrics.webp"
+    alt="Helicone dashboard displaying agent session with tool call trace"
+  />
+</Frame>
+
+## Core Concepts
+
+### Sessions: Grouping Agent Workflows
+
+Sessions group related LLM calls and tool executions into cohesive workflows. Instead of seeing isolated API calls, you see complete agent interactions.
+
+```typescript
+const sessionId = `agent-${Date.now()}`;
+
+const response = await client.chat.completions.create(
+  {
+    model: "gpt-4o",
+    messages: [...],
+  },
+  {
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Name": "Customer Support Agent",
+      "Helicone-Session-Path": "/initial-query",
+    },
+  }
+);
+```
+
+### Session Paths: Tracking Decision Trees
+
+Use paths to track the agent's decision flow:
+
+```typescript
+// Initial classification
+"Helicone-Session-Path": "/classify-query"
+
+// Tool selection
+"Helicone-Session-Path": "/tools/search-database"
+
+// Follow-up based on results
+"Helicone-Session-Path": "/tools/search-database/format-results"
+```
+
+This creates a tree structure showing exactly how your agent made decisions.
+
+## Implementation Guide
+
+<Steps>
+  <Step title="Initialize Agent with Session Tracking">
+    Set up your LLM client to track all agent interactions:
+
+    <Tabs>
+      <Tab title="TypeScript">
+        ```typescript
+        import { OpenAI } from "openai";
+
+        class TrackedAgent {
+          private client: OpenAI;
+          private sessionId: string;
+
+          constructor() {
+            this.client = new OpenAI({
+              baseURL: "https://oai.helicone.ai/v1",
+              apiKey: process.env.OPENAI_API_KEY,
+              defaultHeaders: {
+                "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+              },
+            });
+            this.sessionId = `agent-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          }
+
+          async makeRequest(path: string, messages: any[]) {
+            return await this.client.chat.completions.create(
+              {
+                model: "gpt-4o",
+                messages,
+              },
+              {
+                headers: {
+                  "Helicone-Session-Id": this.sessionId,
+                  "Helicone-Session-Name": "AI Agent",
+                  "Helicone-Session-Path": path,
+                  "Helicone-Property-Agent-Version": "v1.0",
+                },
+              }
+            );
+          }
+        }
+        ```
+      </Tab>
+
+      <Tab title="Python">
+        ```python
+        from openai import OpenAI
+        import time
+        import random
+        import string
+        import os
+
+        class TrackedAgent:
+            def __init__(self):
+                self.client = OpenAI(
+                    api_key=os.getenv("OPENAI_API_KEY"),
+                    base_url="https://oai.helicone.ai/v1",
+                    default_headers={
+                        "Helicone-Auth": f"Bearer {os.getenv('HELICONE_API_KEY')}"
+                    }
+                )
+                random_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=9))
+                self.session_id = f"agent-{int(time.time())}-{random_id}"
+
+            def make_request(self, path: str, messages: list):
+                return self.client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=messages,
+                    extra_headers={
+                        "Helicone-Session-Id": self.session_id,
+                        "Helicone-Session-Name": "AI Agent",
+                        "Helicone-Session-Path": path,
+                        "Helicone-Property-Agent-Version": "v1.0"
+                    }
+                )
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Track Tool Calls with Manual Logger">
+    Use Helicone's Manual Logger to track custom tool executions:
+
+    <Tabs>
+      <Tab title="Python">
+        ```python
+        from helicone_helpers import HeliconeManualLogger
+
+        class AgentWithTools:
+            def __init__(self):
+                self.logger = HeliconeManualLogger(
+                    api_key=os.getenv("HELICONE_API_KEY"),
+                    headers={}
+                )
+                self.session_id = f"agent-{int(time.time())}"
+
+            def execute_tool(self, tool_name: str, parameters: dict):
+                """Track custom tool execution"""
+                def tool_operation(result_recorder):
+                    try:
+                        # Execute your tool logic here
+                        if tool_name == "search_database":
+                            result = self.search_database(**parameters)
+                        elif tool_name == "fetch_weather":
+                            result = self.fetch_weather(**parameters)
+                        else:
+                            result = {"error": f"Unknown tool: {tool_name}"}
+                        
+                        result_recorder.append_results(result)
+                        return result
+                    except Exception as e:
+                        error = {"error": str(e)}
+                        result_recorder.append_results(error)
+                        return error
+
+                return self.logger.log_request(
+                    request={
+                        "_type": "tool",
+                        "toolName": tool_name,
+                        "input": parameters
+                    },
+                    operation=tool_operation,
+                    additional_headers={
+                        "Helicone-Session-Id": self.session_id,
+                        "Helicone-Session-Path": f"/tools/{tool_name}",
+                        "Helicone-Property-Tool-Category": self.get_tool_category(tool_name)
+                    }
+                )
+
+            def search_database(self, query: str, limit: int = 10):
+                # Your database search logic
+                return {"results": [...], "count": limit}
+
+            def fetch_weather(self, location: str):
+                # Your weather API logic
+                return {"temp": 72, "condition": "sunny"}
+
+            def get_tool_category(self, tool_name: str) -> str:
+                categories = {
+                    "search_database": "data",
+                    "fetch_weather": "external-api",
+                    "send_email": "notification"
+                }
+                return categories.get(tool_name, "general")
+        ```
+      </Tab>
+
+      <Tab title="TypeScript">
+        ```typescript
+        import { HeliconeManualLogger } from "@helicone/helicone";
+
+        class AgentWithTools {
+          private logger: HeliconeManualLogger;
+          private sessionId: string;
+
+          constructor() {
+            this.logger = new HeliconeManualLogger({
+              apiKey: process.env.HELICONE_API_KEY!,
+              headers: {},
+            });
+            this.sessionId = `agent-${Date.now()}`;
+          }
+
+          async executeTool(toolName: string, parameters: any) {
+            return await this.logger.logRequest(
+              {
+                _type: "tool",
+                toolName,
+                input: parameters,
+              },
+              async (resultRecorder) => {
+                try {
+                  let result;
+                  switch (toolName) {
+                    case "search_database":
+                      result = await this.searchDatabase(parameters);
+                      break;
+                    case "fetch_weather":
+                      result = await this.fetchWeather(parameters);
+                      break;
+                    default:
+                      result = { error: `Unknown tool: ${toolName}` };
+                  }
+                  resultRecorder.appendResults(result);
+                  return result;
+                } catch (e) {
+                  const error = { error: String(e) };
+                  resultRecorder.appendResults(error);
+                  return error;
+                }
+              },
+              {
+                "Helicone-Session-Id": this.sessionId,
+                "Helicone-Session-Path": `/tools/${toolName}`,
+                "Helicone-Property-Tool-Category": this.getToolCategory(toolName),
+              }
+            );
+          }
+
+          private async searchDatabase(params: any) {
+            // Your database logic
+            return { results: [], count: 0 };
+          }
+
+          private async fetchWeather(params: any) {
+            // Your weather API logic
+            return { temp: 72, condition: "sunny" };
+          }
+
+          private getToolCategory(toolName: string): string {
+            const categories: Record<string, string> = {
+              search_database: "data",
+              fetch_weather: "external-api",
+              send_email: "notification",
+            };
+            return categories[toolName] || "general";
+          }
+        }
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Build Complete Agent Loop">
+    Implement the agent decision loop with full tracing:
+
+    ```python
+    class CompleteAgent:
+        def __init__(self):
+            self.client = OpenAI(
+                api_key=os.getenv("OPENAI_API_KEY"),
+                base_url="https://oai.helicone.ai/v1",
+                default_headers={
+                    "Helicone-Auth": f"Bearer {os.getenv('HELICONE_API_KEY')}"
+                }
+            )
+            self.tool_executor = AgentWithTools()
+            self.session_id = f"agent-{int(time.time())}"
+            self.conversation_history = []
+
+        def run(self, user_query: str) -> str:
+            """Main agent loop with full tracing"""
+            self.conversation_history.append({
+                "role": "user",
+                "content": user_query
+            })
+
+            max_iterations = 5
+            for i in range(max_iterations):
+                # Get LLM decision
+                response = self.client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=self.conversation_history,
+                    tools=self.get_tool_definitions(),
+                    extra_headers={
+                        "Helicone-Session-Id": self.session_id,
+                        "Helicone-Session-Name": "Complete Agent",
+                        "Helicone-Session-Path": f"/iteration/{i}",
+                        "Helicone-Property-Iteration": str(i)
+                    }
+                )
+
+                message = response.choices[0].message
+                
+                # If no tool calls, we have final answer
+                if not message.tool_calls:
+                    return message.content
+                
+                # Execute tool calls
+                self.conversation_history.append(message)
+                
+                for tool_call in message.tool_calls:
+                    tool_result = self.tool_executor.execute_tool(
+                        tool_call.function.name,
+                        json.loads(tool_call.function.arguments)
+                    )
+                    
+                    self.conversation_history.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": json.dumps(tool_result)
+                    })
+
+            return "Agent exceeded maximum iterations"
+
+        def get_tool_definitions(self):
+            return [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "search_database",
+                        "description": "Search the product database",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "query": {"type": "string"},
+                                "limit": {"type": "integer"}
+                            },
+                            "required": ["query"]
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "fetch_weather",
+                        "description": "Get current weather for a location",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "location": {"type": "string"}
+                            },
+                            "required": ["location"]
+                        }
+                    }
+                }
+            ]
+
+    # Usage
+    agent = CompleteAgent()
+    result = agent.run("What's the weather like in San Francisco?")
+    print(result)
+    ```
+  </Step>
+
+  <Step title="View Agent Traces in Dashboard">
+    Navigate to the [Sessions page](https://helicone.ai/sessions) in your Helicone dashboard to see:
+
+    - **Complete session timeline** with all LLM calls and tool executions
+    - **Decision tree visualization** showing agent reasoning paths
+    - **Cost per session** to understand agent economics
+    - **Latency breakdown** identifying slow operations
+    - **Error rates** by tool and decision point
+
+    <Frame>
+      <img
+        src="/images/sessions/session-metrics.webp"
+        alt="Session dashboard showing complete agent trace with metrics"
+      />
+    </Frame>
+  </Step>
+</Steps>
+
+## Advanced Patterns
+
+### Multi-Agent Systems
+
+Track interactions between multiple agents using session properties:
+
+```typescript
+headers: {
+  "Helicone-Session-Id": sharedSessionId,
+  "Helicone-Property-Agent-Name": "research-agent",
+  "Helicone-Property-Agent-Role": "researcher",
+  "Helicone-Property-Parent-Agent": "coordinator"
+}
+```
+
+### Error Recovery Tracking
+
+Log retry attempts and recovery strategies:
+
+```python
+try:
+    result = agent.execute_tool("api_call", params)
+except Exception as e:
+    # Log the error
+    client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "system", "content": f"Error recovery for: {e}"}],
+        extra_headers={
+            "Helicone-Session-Id": session_id,
+            "Helicone-Session-Path": "/error-recovery",
+            "Helicone-Property-Error-Type": type(e).__name__,
+            "Helicone-Property-Recovery-Strategy": "retry-with-fallback"
+        }
+    )
+```
+
+### Performance Optimization
+
+Use session data to identify bottlenecks:
+
+1. **Slow tools** - Which tools take the longest?
+2. **Unnecessary iterations** - Is the agent making redundant calls?
+3. **Expensive decisions** - Which paths cost the most?
+
+## Querying Agent Data
+
+Retrieve agent sessions programmatically:
+
+```typescript
+const response = await fetch("https://api.helicone.ai/v1/session/query", {
+  method: "POST",
+  headers: {
+    "Authorization": `Bearer ${HELICONE_API_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    filter: {
+      properties: {
+        "Agent-Version": "v1.0",
+      },
+    },
+  }),
+});
+
+const sessions = await response.json();
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Descriptive Session Names" icon="tag">
+    Name sessions based on user intent: `"Customer Support - Password Reset"` not `"session-123"`
+  </Accordion>
+
+  <Accordion title="Structure Session Paths Hierarchically" icon="sitemap">
+    Use `/category/subcategory/action` format: `/classify/intent/execute-tool/format-response`
+  </Accordion>
+
+  <Accordion title="Add Context with Properties" icon="list">
+    Track metadata like user tier, feature flags, and A/B test variants using custom properties.
+  </Accordion>
+
+  <Accordion title="Monitor Agent Autonomy" icon="robot">
+    Track how often agents reach max iterations or require human intervention.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Cost Tracking" icon="dollar-sign" href="/guides/cost-tracking">
+    Understand agent economics and optimize spending
+  </Card>
+  <Card title="Sessions Documentation" icon="book" href="/features/sessions">
+    Complete session tracking reference
+  </Card>
+  <Card title="Manual Logger" icon="code" href="/getting-started/integration-method/manual-logger">
+    Track custom tools and non-LLM operations
+  </Card>
+  <Card title="Custom Properties" icon="tags" href="/features/advanced-usage/custom-properties">
+    Add rich metadata to agent traces
+  </Card>
+</CardGroup>

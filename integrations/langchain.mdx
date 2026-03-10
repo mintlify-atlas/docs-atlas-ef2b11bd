@@ -1,0 +1,556 @@
+---
+title: 'LangChain Integration'
+description: 'Integrate Helicone with LangChain for observability and monitoring'
+icon: 'link'
+---
+
+Helicone integrates with LangChain to provide comprehensive observability for your LLM applications, agents, and chains.
+
+## Integration Methods
+
+<CardGroup cols={2}>
+  <Card title="AI Gateway" icon="network-wired" href="/gateway/overview">
+    Use the AI Gateway for unified access to all providers with automatic fallbacks.
+  </Card>
+  <Card title="Proxy Integration" icon="shuffle">
+    Route LangChain requests through Helicone's proxy.
+  </Card>
+  <Card title="Async Logging" icon="bolt" href="/integrations/async-logging">
+    Zero-latency logging using OpenLLMetry.
+  </Card>
+  <Card title="Custom Headers" icon="code">
+    Add Helicone headers to existing LangChain applications.
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+<Tabs>
+  <Tab title="TypeScript/JavaScript">
+    <Steps>
+      <Step title="Install dependencies">
+        ```bash
+        npm install @langchain/openai @langchain/anthropic
+        ```
+      </Step>
+      
+      <Step title="Configure with Helicone proxy">
+        ```typescript
+        import { ChatOpenAI } from "@langchain/openai";
+
+        const model = new ChatOpenAI({
+          modelName: "gpt-4o-mini",
+          configuration: {
+            baseURL: "https://oai.helicone.ai/v1",
+            defaultHeaders: {
+              "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+            },
+          },
+        });
+
+        const response = await model.invoke("What is the capital of France?");
+        console.log(response.content);
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+  
+  <Tab title="Python">
+    <Steps>
+      <Step title="Install dependencies">
+        ```bash
+        pip install langchain langchain-openai langchain-anthropic
+        ```
+      </Step>
+      
+      <Step title="Configure with Helicone proxy">
+        ```python
+        from langchain_openai import ChatOpenAI
+        import os
+
+        model = ChatOpenAI(
+            model="gpt-4o-mini",
+            base_url="https://oai.helicone.ai/v1",
+            default_headers={
+                "Helicone-Auth": f"Bearer {os.getenv('HELICONE_API_KEY')}"
+            }
+        )
+
+        response = model.invoke("What is the capital of France?")
+        print(response.content)
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Using the AI Gateway
+
+The AI Gateway provides a unified interface for all providers:
+
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+
+const model = new ChatOpenAI({
+  modelName: "claude-3-5-sonnet-20240620/anthropic", // Use any provider
+  configuration: {
+    baseURL: "https://ai-gateway.helicone.ai",
+    apiKey: process.env.HELICONE_API_KEY,
+  },
+});
+
+const response = await model.invoke("Hello!");
+```
+
+Learn more about the [AI Gateway](/gateway/overview).
+
+## Chains
+
+Track LangChain chains with full visibility:
+
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+import { PromptTemplate } from "@langchain/core/prompts";
+import { StringOutputParser } from "@langchain/core/output_parsers";
+
+const model = new ChatOpenAI({
+  modelName: "gpt-4o-mini",
+  configuration: {
+    baseURL: "https://oai.helicone.ai/v1",
+    defaultHeaders: {
+      "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+      "Helicone-Session-Id": "chain-session-123",
+      "Helicone-Property-Chain": "translation-chain",
+    },
+  },
+});
+
+const prompt = PromptTemplate.fromTemplate(
+  "Translate the following text to {language}: {text}"
+);
+
+const chain = prompt.pipe(model).pipe(new StringOutputParser());
+
+const result = await chain.invoke({
+  language: "French",
+  text: "Hello, how are you?",
+});
+
+console.log(result);
+```
+
+## Agents
+
+Monitor LangChain agents and tool usage:
+
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+import { createOpenAIFunctionsAgent, AgentExecutor } from "langchain/agents";
+import { pull } from "langchain/hub";
+import { Calculator } from "@langchain/community/tools/calculator";
+import { v4 as uuidv4 } from "uuid";
+
+const sessionId = uuidv4();
+
+const model = new ChatOpenAI({
+  modelName: "gpt-4o-mini",
+  configuration: {
+    baseURL: "https://oai.helicone.ai/v1",
+    defaultHeaders: {
+      "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Name": "Calculator Agent",
+      "Helicone-Property-Agent": "calculator",
+    },
+  },
+});
+
+const tools = [new Calculator()];
+const prompt = await pull("hwchase17/openai-functions-agent");
+const agent = await createOpenAIFunctionsAgent({
+  llm: model,
+  tools,
+  prompt,
+});
+
+const agentExecutor = new AgentExecutor({
+  agent,
+  tools,
+});
+
+const result = await agentExecutor.invoke({
+  input: "What is 25 * 4 + 10?",
+});
+
+console.log(result.output);
+```
+
+View the full agent execution trace in your Helicone dashboard, including:
+- All LLM calls
+- Tool invocations
+- Intermediate steps
+- Total cost and latency
+
+## Retrieval (RAG)
+
+Track RAG pipelines with custom properties:
+
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { MemoryVectorStore } from "langchain/vectorstores/memory";
+import { RetrievalQAChain } from "langchain/chains";
+
+const embeddings = new OpenAIEmbeddings({
+  configuration: {
+    baseURL: "https://oai.helicone.ai/v1",
+    defaultHeaders: {
+      "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+      "Helicone-Property-Type": "embedding",
+    },
+  },
+});
+
+const vectorStore = await MemoryVectorStore.fromTexts(
+  [
+    "Paris is the capital of France.",
+    "Berlin is the capital of Germany.",
+    "London is the capital of England.",
+  ],
+  [{}, {}, {}],
+  embeddings
+);
+
+const model = new ChatOpenAI({
+  modelName: "gpt-4o-mini",
+  configuration: {
+    baseURL: "https://oai.helicone.ai/v1",
+    defaultHeaders: {
+      "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+      "Helicone-Property-Type": "rag-query",
+    },
+  },
+});
+
+const chain = RetrievalQAChain.fromLLM(model, vectorStore.asRetriever());
+
+const result = await chain.call({
+  query: "What is the capital of France?",
+});
+
+console.log(result.text);
+```
+
+## Session Tracking
+
+Track multi-step LangChain workflows:
+
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+import { v4 as uuidv4 } from "uuid";
+
+const sessionId = uuidv4();
+
+const model = new ChatOpenAI({
+  modelName: "gpt-4o-mini",
+  configuration: {
+    baseURL: "https://oai.helicone.ai/v1",
+    defaultHeaders: {
+      "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Name": "Research Assistant",
+    },
+  },
+});
+
+// Step 1: Research
+const research = await model.invoke("Summarize quantum computing", {
+  headers: {
+    "Helicone-Session-Path": "/research",
+  },
+});
+
+// Step 2: Write
+const article = await model.invoke(
+  `Write a blog post based on: ${research.content}`,
+  {
+    headers: {
+      "Helicone-Session-Path": "/write",
+    },
+  }
+);
+
+// Step 3: Review
+const review = await model.invoke(`Review and improve: ${article.content}`, {
+  headers: {
+    "Helicone-Session-Path": "/review",
+  },
+});
+```
+
+Learn more about [Session Tracking](/observability/sessions).
+
+## Custom Properties
+
+Add context to your LangChain requests:
+
+```typescript
+const model = new ChatOpenAI({
+  modelName: "gpt-4o-mini",
+  configuration: {
+    baseURL: "https://oai.helicone.ai/v1",
+    defaultHeaders: {
+      "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+      "Helicone-User-Id": "user-123",
+      "Helicone-Property-Environment": "production",
+      "Helicone-Property-Application": "chatbot",
+      "Helicone-Property-Version": "v2.1.0",
+    },
+  },
+});
+```
+
+## Streaming
+
+Helicone supports LangChain streaming:
+
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+
+const model = new ChatOpenAI({
+  modelName: "gpt-4o-mini",
+  streaming: true,
+  configuration: {
+    baseURL: "https://oai.helicone.ai/v1",
+    defaultHeaders: {
+      "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+    },
+  },
+});
+
+const stream = await model.stream("Write a poem about AI");
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.content);
+}
+```
+
+## Anthropic with LangChain
+
+Use Anthropic Claude with LangChain:
+
+```typescript
+import { ChatAnthropic } from "@langchain/anthropic";
+
+const model = new ChatAnthropic({
+  modelName: "claude-3-5-sonnet-20240620",
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+  clientOptions: {
+    baseURL: "https://anthropic.helicone.ai",
+    defaultHeaders: {
+      "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+    },
+  },
+});
+
+const response = await model.invoke("Hello!");
+console.log(response.content);
+```
+
+## Zero-Latency Integration
+
+For production applications, use async logging:
+
+```typescript
+import { HeliconeAsyncLogger } from "@helicone/async";
+import OpenAI from "openai";
+import { ChatOpenAI } from "@langchain/openai";
+
+const logger = new HeliconeAsyncLogger({
+  apiKey: process.env.HELICONE_API_KEY,
+  providers: {
+    openAI: OpenAI,
+    langchain: {
+      chainsModule: await import("langchain/chains"),
+      agentsModule: await import("langchain/agents"),
+      toolsModule: await import("langchain/tools"),
+    },
+  },
+});
+logger.init();
+
+// Use LangChain normally - logging happens asynchronously
+const model = new ChatOpenAI({
+  modelName: "gpt-4o-mini",
+});
+
+const response = await model.invoke("Hello!");
+```
+
+Learn more about [Async Logging](/integrations/async-logging).
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use session IDs for multi-step workflows">
+    Track complete workflows with session IDs:
+    
+    ```typescript
+    const sessionId = uuidv4();
+    
+    defaultHeaders: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Name": "Research Pipeline",
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Add custom properties for filtering">
+    Use custom properties to organize requests:
+    
+    ```typescript
+    defaultHeaders: {
+      "Helicone-Property-Chain-Type": "rag",
+      "Helicone-Property-Environment": "production",
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Track tool usage">
+    Label agent tool calls:
+    
+    ```typescript
+    defaultHeaders: {
+      "Helicone-Property-Tools": "calculator,search,database",
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Monitor embeddings separately">
+    Track embedding and completion costs separately:
+    
+    ```typescript
+    // For embeddings
+    const embeddings = new OpenAIEmbeddings({
+      configuration: {
+        defaultHeaders: {
+          "Helicone-Property-Type": "embedding",
+        },
+      },
+    });
+
+    // For completions
+    const model = new ChatOpenAI({
+      configuration: {
+        defaultHeaders: {
+          "Helicone-Property-Type": "completion",
+        },
+      },
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Python Examples
+
+### Basic Usage
+
+```python
+from langchain_openai import ChatOpenAI
+import os
+
+model = ChatOpenAI(
+    model="gpt-4o-mini",
+    base_url="https://oai.helicone.ai/v1",
+    default_headers={
+        "Helicone-Auth": f"Bearer {os.getenv('HELICONE_API_KEY')}",
+        "Helicone-User-Id": "user-123",
+    }
+)
+
+response = model.invoke("What is the capital of France?")
+print(response.content)
+```
+
+### Chains in Python
+
+```python
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+import os
+
+model = ChatOpenAI(
+    model="gpt-4o-mini",
+    base_url="https://oai.helicone.ai/v1",
+    default_headers={
+        "Helicone-Auth": f"Bearer {os.getenv('HELICONE_API_KEY')}",
+        "Helicone-Property-Chain": "translation",
+    }
+)
+
+prompt = ChatPromptTemplate.from_template(
+    "Translate the following to {language}: {text}"
+)
+
+chain = prompt | model | StrOutputParser()
+
+result = chain.invoke({
+    "language": "French",
+    "text": "Hello, how are you?"
+})
+
+print(result)
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Requests not appearing in dashboard">
+    1. Verify your Helicone API key is correct
+    2. Check the `Helicone-Auth` header format: `Bearer sk-helicone-...`
+    3. Ensure you're using the correct base URL
+    4. Check that `defaultHeaders` is in the `configuration` object
+  </Accordion>
+  
+  <Accordion title="Session tracking not working">
+    - Ensure you're using the same session ID across requests
+    - Session IDs must be UUIDs or unique strings
+    - Include `Helicone-Session-Id` in every request of the session
+  </Accordion>
+  
+  <Accordion title="Headers not being sent">
+    In LangChain, headers must be in the `configuration` object:
+    
+    ```typescript
+    // Correct
+    new ChatOpenAI({
+      configuration: {
+        defaultHeaders: { "Helicone-Auth": "..." }
+      }
+    })
+
+    // Incorrect
+    new ChatOpenAI({
+      defaultHeaders: { "Helicone-Auth": "..." }
+    })
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="AI Gateway" icon="network-wired" href="/gateway/overview">
+    Use multiple providers with automatic fallbacks
+  </Card>
+  <Card title="Session Tracking" icon="diagram-project" href="/observability/sessions">
+    Track complex workflows
+  </Card>
+  <Card title="Async Logging" icon="bolt" href="/integrations/async-logging">
+    Zero-latency integration
+  </Card>
+  <Card title="Custom Properties" icon="tag" href="/features/custom-properties">
+    Add custom metadata
+  </Card>
+</CardGroup>

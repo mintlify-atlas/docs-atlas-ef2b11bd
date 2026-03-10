@@ -1,0 +1,477 @@
+---
+title: "Prompt Integration"
+description: "Use prompts stored in Helicone with the AI Gateway"
+---
+
+## Overview
+
+Helicone AI Gateway integrates seamlessly with Helicone's prompt management system, allowing you to:
+
+- Use versioned prompts stored in Helicone
+- Dynamically inject prompt variables
+- Track prompt usage across providers
+- Deploy prompts without code changes
+
+<Info>
+Prompt integration works with all gateway features including routing, fallbacks, and BYOK/PTB.
+</Info>
+
+## How It Works
+
+When you include prompt fields in your request, the gateway:
+
+1. Fetches the prompt template from Helicone
+2. Injects your input variables
+3. Expands the template into messages
+4. Routes to the appropriate provider
+
+## Using Prompts with the Gateway
+
+### Basic Prompt Usage
+
+```typescript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  baseURL: "https://ai-gateway.helicone.ai",
+  apiKey: process.env.HELICONE_API_KEY,
+});
+
+const response = await client.chat.completions.create({
+  prompt_id: "pirate-bot",
+  model: "gpt-4o-mini",
+  inputs: {
+    person: "Alice",
+  },
+});
+```
+
+**What happens:**
+1. Gateway fetches the "pirate-bot" prompt template
+2. Injects `person: "Alice"` into the template
+3. Expands to full messages array
+4. Routes to GPT-4o-mini
+
+### Model from Prompt
+
+You can omit the `model` field and use the model defined in the prompt:
+
+```typescript
+const response = await client.chat.completions.create({
+  prompt_id: "pirate-bot",
+  inputs: {
+    person: "Alice",
+  },
+});
+// Uses the model configured in the "pirate-bot" prompt
+```
+
+<Note>
+If both `model` and `prompt_id` are provided, the `model` in the request takes precedence.
+</Note>
+
+### Prompt Versioning
+
+Use specific prompt versions:
+
+```typescript
+const response = await client.chat.completions.create({
+  prompt_id: "pirate-bot",
+  version_id: "v2.1.3",  // Use specific version
+  model: "gpt-4o-mini",
+  inputs: {
+    person: "Alice",
+  },
+});
+```
+
+### Environment-Specific Prompts
+
+Use different prompt versions per environment:
+
+```typescript
+const response = await client.chat.completions.create({
+  prompt_id: "pirate-bot",
+  environment: "production",  // or "staging", "development"
+  model: "gpt-4o-mini",
+  inputs: {
+    person: "Alice",
+  },
+});
+```
+
+## Prompt Fields
+
+<ParamField body="prompt_id" type="string" required>
+  The ID of the prompt to use from Helicone
+</ParamField>
+
+<ParamField body="inputs" type="object" required>
+  Key-value pairs to inject into the prompt template
+</ParamField>
+
+<ParamField body="version_id" type="string">
+  Specific version of the prompt to use (default: latest)
+</ParamField>
+
+<ParamField body="environment" type="string">
+  Environment to use for prompt resolution: `production`, `staging`, or `development`
+</ParamField>
+
+<ParamField body="model" type="string">
+  Override the model defined in the prompt
+</ParamField>
+
+## Creating Prompts
+
+Create and manage prompts in the Helicone dashboard:
+
+<Steps>
+  <Step title="Navigate to Prompts">
+    Go to [Prompts](https://helicone.ai/prompts) in the Helicone dashboard
+  </Step>
+
+  <Step title="Create New Prompt">
+    Click "New Prompt" and define:
+    - Prompt ID (e.g., "pirate-bot")
+    - Model to use
+    - Message template with variables
+    - Version tags
+  </Step>
+
+  <Step title="Add Variables">
+    Use `{{ variable_name }}` syntax in your prompt:
+    
+    ```
+    You are a helpful chatbot that only talks like a pirate.
+    You are speaking with {{ person }}!
+    ```
+  </Step>
+
+  <Step title="Deploy">
+    Save and deploy your prompt
+  </Step>
+</Steps>
+
+## Prompt Format with hpf
+
+Use the Helicone Prompt Format (hpf) helper in your code:
+
+```typescript
+import { hpf } from "@helicone/prompts";
+
+const chatCompletion = await client.chat.completions.create(
+  {
+    model: "gpt-4-turbo",
+    messages: [
+      {
+        role: "system",
+        content: hpf`You are a helpful chatbot, that only talks like a pirate.
+        You are speaking with ${{ person: "Alice" }}!`,
+      },
+    ],
+    max_tokens: 700,
+  },
+  {
+    headers: {
+      "Helicone-Prompt-Id": "pirate-bot",
+    },
+  }
+);
+```
+
+<Info>
+The `hpf` helper automatically tracks prompt variables and associates them with the prompt ID.
+</Info>
+
+## Prompts with Fallbacks
+
+Combine prompts with provider fallbacks:
+
+```typescript
+const response = await client.chat.completions.create({
+  prompt_id: "pirate-bot",
+  model: "gpt-4o/openai,gpt-4o/azure,claude-sonnet-4",
+  inputs: {
+    person: "Alice",
+  },
+});
+```
+
+**Behavior:**
+1. Fetches "pirate-bot" prompt
+2. Tries GPT-4o on OpenAI
+3. Falls back to Azure if needed
+4. Falls back to Claude if needed
+
+## Using with Helicone-Auth Header
+
+When using the traditional proxy pattern with `Helicone-Auth` header:
+
+```typescript
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,  // Provider key
+  baseURL: "https://oai.helicone.ai/v1",
+  defaultHeaders: {
+    "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+  },
+});
+
+const response = await client.chat.completions.create(
+  {
+    model: "gpt-4-turbo",
+    messages: [
+      {
+        role: "system",
+        content: hpf`You are a helpful chatbot.
+        Speaking with ${{ person: "Alice" }}!`,
+      },
+    ],
+  },
+  {
+    headers: {
+      "Helicone-Prompt-Id": "pirate-bot",
+    },
+  }
+);
+```
+
+## Prompt Tracking
+
+All requests using prompts are automatically tracked:
+
+<Steps>
+  <Step title="View Prompt Usage">
+    Navigate to [Prompts](https://helicone.ai/prompts) in the dashboard
+  </Step>
+
+  <Step title="Select Your Prompt">
+    Click on a prompt to see:
+    - Total requests
+    - Success rate
+    - Cost by provider
+    - Latency metrics
+  </Step>
+
+  <Step title="Analyze Performance">
+    Compare versions and environments:
+    - Which version performs best?
+    - Which provider is most cost-effective?
+    - Where are errors occurring?
+  </Step>
+</Steps>
+
+## Advanced Patterns
+
+### Dynamic Model Selection
+
+Use prompt fields with dynamic models:
+
+```typescript
+function getPromptConfig(userTier: "free" | "premium") {
+  return {
+    prompt_id: "pirate-bot",
+    model: userTier === "premium" 
+      ? "gpt-4o" 
+      : "gpt-4o-mini/deepinfra,gpt-4o-mini",
+  };
+}
+
+const response = await client.chat.completions.create({
+  ...getPromptConfig("free"),
+  inputs: {
+    person: "Alice",
+  },
+});
+```
+
+### Conditional Prompt Selection
+
+Select prompts based on context:
+
+```typescript
+function selectPrompt(conversation_type: string) {
+  const prompts = {
+    customer_support: "support-bot",
+    sales: "sales-assistant",
+    technical: "tech-expert",
+  };
+  return prompts[conversation_type] || "default-bot";
+}
+
+const response = await client.chat.completions.create({
+  prompt_id: selectPrompt("customer_support"),
+  model: "gpt-4o-mini",
+  inputs: {
+    user_name: "Alice",
+    issue: "billing question",
+  },
+});
+```
+
+### A/B Testing Prompts
+
+Test different prompt versions:
+
+```typescript
+function getPromptVersion(userId: string) {
+  // Simple A/B test: 50/50 split
+  const hash = userId.charCodeAt(0);
+  return hash % 2 === 0 ? "v1.0" : "v2.0";
+}
+
+const response = await client.chat.completions.create({
+  prompt_id: "pirate-bot",
+  version_id: getPromptVersion(user.id),
+  model: "gpt-4o-mini",
+  inputs: {
+    person: user.name,
+  },
+});
+```
+
+## Error Handling
+
+### Prompt Not Found
+
+```json
+{
+  "error": {
+    "message": "Prompt 'invalid-id' not found",
+    "type": "prompt_not_found"
+  }
+}
+```
+
+### Missing Required Inputs
+
+```json
+{
+  "error": {
+    "message": "Missing required input: 'person'",
+    "type": "missing_input"
+  }
+}
+```
+
+### Invalid Version
+
+```json
+{
+  "error": {
+    "message": "Version 'v999' not found for prompt 'pirate-bot'",
+    "type": "version_not_found"
+  }
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Version Your Prompts" icon="code-branch">
+    Use semantic versioning for prompts:
+    
+    - `v1.0.0`: Major changes (breaking)
+    - `v1.1.0`: Minor improvements
+    - `v1.1.1`: Bug fixes
+    
+    Pin critical production code to specific versions:
+    ```typescript
+    version_id: "v1.2.3"  // Stable version
+    ```
+  </Accordion>
+
+  <Accordion title="Use Environment Tags" icon="tags">
+    Deploy different prompts per environment:
+    
+    ```typescript
+    environment: process.env.NODE_ENV  // production, staging, development
+    ```
+  </Accordion>
+
+  <Accordion title="Track Prompt Performance" icon="chart-line">
+    Monitor prompt metrics in the dashboard:
+    - Success rate by version
+    - Cost per prompt
+    - Latency trends
+    - Provider distribution
+  </Accordion>
+
+  <Accordion title="Test Before Deploying" icon="flask">
+    Test prompt changes thoroughly:
+    1. Deploy to `development` environment
+    2. Test with various inputs
+    3. Promote to `staging`
+    4. Deploy to `production` after validation
+  </Accordion>
+
+  <Accordion title="Use Descriptive IDs" icon="tag">
+    Use clear, descriptive prompt IDs:
+    
+    ```typescript
+    // Good
+    prompt_id: "customer-support-greeting"
+    prompt_id: "sales-product-recommendation"
+    
+    // Avoid
+    prompt_id: "prompt1"
+    prompt_id: "test"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Complete Example
+
+```typescript
+import OpenAI from "openai";
+import { hpf } from "@helicone/prompts";
+
+const client = new OpenAI({
+  baseURL: "https://ai-gateway.helicone.ai",
+  apiKey: process.env.HELICONE_API_KEY,
+});
+
+async function customerSupportBot(userName: string, issue: string) {
+  try {
+    const response = await client.chat.completions.create({
+      prompt_id: "customer-support",
+      environment: process.env.NODE_ENV,
+      model: "gpt-4o/openai,gpt-4o/azure,claude-sonnet-4",
+      inputs: {
+        user_name: userName,
+        issue: issue,
+        current_date: new Date().toISOString(),
+      },
+    });
+    
+    return response.choices[0].message.content;
+  } catch (error) {
+    console.error("Support bot error:", error);
+    throw error;
+  }
+}
+
+// Usage
+const reply = await customerSupportBot(
+  "Alice",
+  "I can't access my account"
+);
+console.log(reply);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Create Prompts" icon="plus" href="https://helicone.ai/prompts">
+    Start creating prompts in the dashboard
+  </Card>
+  <Card title="Routing" icon="route" href="/gateway/routing">
+    Learn about provider routing
+  </Card>
+  <Card title="Fallbacks" icon="shield" href="/gateway/fallbacks">
+    Configure automatic failover
+  </Card>
+  <Card title="Prompt Docs" icon="book" href="/features/prompts">
+    Full prompt management documentation
+  </Card>
+</CardGroup>

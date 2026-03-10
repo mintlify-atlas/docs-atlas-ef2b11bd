@@ -1,0 +1,498 @@
+---
+title: "Prompt Experiments"
+description: "Run A/B tests and experiments to compare prompt versions and measure performance"
+icon: "flask"
+---
+
+Helicone's experiment system lets you compare prompt versions side-by-side, run A/B tests, and measure which variations perform best before deploying to production.
+
+## What Are Experiments?
+
+Experiments allow you to:
+- **Compare multiple prompts or versions** against the same inputs
+- **Test different models** (GPT-4 vs Claude vs Gemini)
+- **Measure performance** with automated evaluators
+- **Validate improvements** before production deployment
+- **Build datasets** from production traffic or manual inputs
+
+<CardGroup cols={2}>
+  <Card title="Side-by-Side Comparison" icon="columns">
+    Run multiple prompt versions simultaneously and compare outputs
+  </Card>
+  <Card title="Automated Scoring" icon="chart-line">
+    Use evaluators to score responses on quality, relevance, and custom metrics
+  </Card>
+  <Card title="Production Testing" icon="flask-vial">
+    Test variations with real production inputs before deployment
+  </Card>
+  <Card title="Dataset Building" icon="database">
+    Create reusable test datasets from experiments
+  </Card>
+</CardGroup>
+
+## Creating an Experiment
+
+### From the UI
+
+<Steps>
+  <Step title="Navigate to Experiments">
+    Go to **Experiments** in your Helicone dashboard.
+  </Step>
+  
+  <Step title="Choose creation method">
+    Create an experiment:
+    - **From scratch**: Manual input rows
+    - **From prompt**: Use an existing prompt as the baseline
+    - **From dataset**: Use a saved dataset
+  </Step>
+  
+  <Step title="Configure inputs">
+    Add test cases with variables that will be passed to prompts:
+    ```json
+    {
+      "userName": "Alice",
+      "topic": "machine learning"
+    }
+    ```
+  </Step>
+  
+  <Step title="Add hypotheses">
+    Create columns for each variation you want to test:
+    - Different prompt versions
+    - Different models
+    - Different parameters (temperature, max_tokens)
+  </Step>
+  
+  <Step title="Run the experiment">
+    Execute all hypothesis combinations and view results in a table.
+  </Step>
+</Steps>
+
+### From a Prompt
+
+Start an experiment directly from a prompt:
+
+<Steps>
+  <Step title="Open your prompt">
+    Navigate to the prompt you want to test.
+  </Step>
+  
+  <Step title="Click Experiment">
+    Find the **Experiment** button in the prompt editor.
+  </Step>
+  
+  <Step title="Select inputs">
+    Choose inputs from:
+    - Production request history
+    - Manual input creation
+    - Existing datasets
+  </Step>
+  
+  <Step title="Add variations">
+    Create hypothesis columns with different versions or configurations.
+  </Step>
+</Steps>
+
+## Experiment Structure
+
+An experiment consists of:
+
+### Inputs (Rows)
+
+Each row represents a test case with variables:
+
+| userName | topic               | context |
+|----------|---------------------|----------|
+| Alice    | machine learning    | beginner |
+| Bob      | neural networks     | advanced |
+| Carol    | prompt engineering  | intermediate |
+
+### Hypotheses (Columns)
+
+Each column represents a variation to test:
+
+| Hypothesis      | Prompt Version | Model        | Temperature |
+|-----------------|----------------|--------------|-------------|
+| Baseline        | 1.0            | gpt-4o       | 0.7         |
+| New Version     | 2.0            | gpt-4o       | 0.7         |
+| Claude Alt      | 1.0            | claude-3-5   | 0.7         |
+| Higher Temp     | 2.0            | gpt-4o       | 0.9         |
+
+### Results
+
+The experiment grid shows outputs for each input × hypothesis combination, along with:
+- Response text
+- Token usage
+- Latency
+- Cost
+- Evaluator scores
+
+## Running Experiments
+
+### Execute All Tests
+
+Run the experiment to generate outputs for all combinations:
+
+```typescript
+// Experiments automatically execute when created via API
+const response = await fetch("https://api.helicone.ai/v2/experiment/create/empty", {
+  method: "POST",
+  headers: {
+    "Authorization": `Bearer ${HELICONE_API_KEY}`,
+    "Content-Type": "application/json",
+  },
+});
+
+const { experimentId } = await response.json();
+```
+
+### View Results
+
+Results appear in a table format with:
+- Input variables
+- Output for each hypothesis
+- Token counts and costs
+- Latency measurements
+- Evaluator scores
+
+### Compare Side-by-Side
+
+The experiment table lets you:
+- Scroll horizontally to compare outputs
+- Sort by evaluator scores
+- Filter by input variables
+- Highlight differences between versions
+
+## Evaluators
+
+Evaluators automatically score experiment outputs based on criteria you define.
+
+### Adding Evaluators
+
+<Steps>
+  <Step title="Open experiment settings">
+    Click the **Evaluators** button in your experiment.
+  </Step>
+  
+  <Step title="Create or select evaluator">
+    Choose from:
+    - **LLM-as-Judge**: Use GPT-4 or Claude to score responses
+    - **Regex**: Pattern matching for specific content
+    - **Custom**: API-based evaluator with your own logic
+  </Step>
+  
+  <Step title="Configure scoring">
+    Define scoring criteria:
+    ```json
+    {
+      "name": "Relevance",
+      "description": "Score 1-5 based on how relevant the response is to the question",
+      "type": "llm-judge",
+      "model": "gpt-4o",
+      "prompt": "Rate the relevance of this response..."
+    }
+    ```
+  </Step>
+  
+  <Step title="Run evaluators">
+    Execute evaluators across all experiment outputs.
+  </Step>
+</Steps>
+
+### Evaluator Types
+
+#### LLM-as-Judge
+
+Use another LLM to score responses:
+
+```json
+{
+  "type": "llm-judge",
+  "model": "gpt-4o",
+  "criteria": [
+    "Accuracy",
+    "Clarity",
+    "Helpfulness"
+  ],
+  "scale": "1-5"
+}
+```
+
+#### Pattern Matching
+
+Score based on content patterns:
+
+```json
+{
+  "type": "regex",
+  "patterns": [
+    {
+      "pattern": "\\b(sorry|apologize)\\b",
+      "score": -1,
+      "reason": "Unnecessary apology"
+    },
+    {
+      "pattern": "\\b(step-by-step|walkthrough)\\b",
+      "score": 1,
+      "reason": "Structured response"
+    }
+  ]
+}
+```
+
+#### Custom Evaluator
+
+Call your own API for scoring:
+
+```json
+{
+  "type": "custom",
+  "endpoint": "https://api.example.com/evaluate",
+  "method": "POST",
+  "headers": {
+    "Authorization": "Bearer YOUR_TOKEN"
+  }
+}
+```
+
+### Viewing Scores
+
+Evaluator scores appear as columns in the experiment table:
+
+| Input | Baseline Output | New Version Output | Relevance (Baseline) | Relevance (New) | Winner |
+|-------|-----------------|-------------------|---------------------|-----------------|--------|
+| ...   | ...             | ...               | 3.5                 | 4.2             | New    |
+| ...   | ...             | ...               | 4.0                 | 3.8             | Baseline|
+
+## Datasets
+
+Datasets are reusable collections of test inputs.
+
+### Creating Datasets
+
+<Steps>
+  <Step title="From production traffic">
+    Select requests from your logs and add them to a dataset.
+  </Step>
+  
+  <Step title="From experiments">
+    Save successful experiment inputs as a dataset for future tests.
+  </Step>
+  
+  <Step title="Manual creation">
+    Create a dataset by manually defining test cases.
+  </Step>
+  
+  <Step title="CSV import">
+    Upload a CSV file with input variables.
+  </Step>
+</Steps>
+
+### Using Datasets
+
+Reuse datasets across multiple experiments:
+
+```typescript
+// Create experiment from dataset
+const response = await fetch("https://api.helicone.ai/v2/experiment", {
+  method: "POST",
+  headers: {
+    "Authorization": `Bearer ${HELICONE_API_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    datasetId: "dataset-123",
+    hypotheses: [
+      {
+        promptVersionId: "version-abc",
+        model: "gpt-4o",
+      },
+      {
+        promptVersionId: "version-xyz",
+        model: "gpt-4o",
+      },
+    ],
+  }),
+});
+```
+
+## Experiment Workflows
+
+### A/B Testing Workflow
+
+<Steps>
+  <Step title="Create baseline">
+    Run experiment with current production prompt (version 1.0).
+  </Step>
+  
+  <Step title="Add variation">
+    Create hypothesis column with new prompt version (version 2.0).
+  </Step>
+  
+  <Step title="Run on production inputs">
+    Use recent production requests as test inputs.
+  </Step>
+  
+  <Step title="Score with evaluators">
+    Run automated evaluators to measure quality.
+  </Step>
+  
+  <Step title="Analyze results">
+    Compare scores, costs, and latency:
+    - Version 2.0: Avg score 4.3, $0.02/request
+    - Version 1.0: Avg score 3.8, $0.03/request
+  </Step>
+  
+  <Step title="Deploy winner">
+    If version 2.0 performs better, deploy to production.
+  </Step>
+</Steps>
+
+### Model Comparison
+
+<Steps>
+  <Step title="Create hypotheses for each model">
+    - GPT-4o
+    - Claude 3.5 Sonnet
+    - Gemini 1.5 Pro
+  </Step>
+  
+  <Step title="Use same prompt across all">
+    Keep prompt constant, vary only the model.
+  </Step>
+  
+  <Step title="Run experiment">
+    Execute all combinations.
+  </Step>
+  
+  <Step title="Compare cost vs quality">
+    - GPT-4o: Score 4.2, $0.02
+    - Claude: Score 4.5, $0.025
+    - Gemini: Score 3.9, $0.015
+  </Step>
+</Steps>
+
+### Parameter Tuning
+
+<Steps>
+  <Step title="Create hypotheses with different parameters">
+    - Temperature: 0.3, 0.7, 0.9
+    - Max tokens: 500, 1000, 2000
+  </Step>
+  
+  <Step title="Run experiments">
+    Test all combinations.
+  </Step>
+  
+  <Step title="Find optimal settings">
+    Identify the sweet spot for quality, cost, and latency.
+  </Step>
+</Steps>
+
+## Experiment API
+
+### Create Experiment
+
+```bash
+curl -X POST https://api.helicone.ai/v2/experiment/create/empty \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json"
+```
+
+### List Experiments
+
+```bash
+curl -X GET https://api.helicone.ai/v2/experiment \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+### Get Experiment Details
+
+```bash
+curl -X POST https://api.helicone.ai/v1/experiment/query \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "experiment": {
+        "id": {
+          "equals": "experiment-123"
+        }
+      }
+    },
+    "include": {
+      "inputs": true,
+      "responseBodies": true
+    }
+  }'
+```
+
+### Delete Experiment
+
+```bash
+curl -X DELETE https://api.helicone.ai/v2/experiment/{experimentId} \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+## Best Practices
+
+<Check>**Use production data**: Test with real inputs your users will provide</Check>
+
+<Check>**Run evaluators consistently**: Define clear scoring criteria and use them across all experiments</Check>
+
+<Check>**Test multiple dimensions**: Compare prompts, models, and parameters separately</Check>
+
+<Check>**Build reusable datasets**: Save high-quality test cases for future experiments</Check>
+
+<Check>**Document findings**: Add notes to experiments explaining results and decisions</Check>
+
+<Warning>**Don't over-optimize**: A small score difference may not matter in production</Warning>
+
+<Warning>**Consider cost**: A higher-scoring version may not justify significantly higher costs</Warning>
+
+## Analyzing Results
+
+### Statistical Significance
+
+Consider:
+- **Sample size**: Test with at least 20-50 inputs for meaningful results
+- **Variance**: Look at score distribution, not just averages
+- **Edge cases**: Ensure new versions handle corner cases well
+
+### Cost Analysis
+
+Compare total cost per hypothesis:
+```
+Hypothesis A: 50 tests × $0.02 = $1.00 (avg score: 4.2)
+Hypothesis B: 50 tests × $0.03 = $1.50 (avg score: 4.3)
+
+Cost increase: 50%
+Score increase: 2.4%
+Verdict: Hypothesis A is more cost-effective
+```
+
+### Latency Impact
+
+Monitor response times:
+- P50 latency
+- P95 latency
+- Max latency
+
+A better prompt isn't worth it if it makes your app feel slow.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Versioning" icon="code-branch" href="/prompts/versioning">
+    Learn more about managing prompt versions
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/prompts/deployment">
+    Deploy winning variations to production
+  </Card>
+  <Card title="Observability" icon="chart-line" href="/observability/overview">
+    Monitor deployed prompts in production
+  </Card>
+  <Card title="Evaluation" icon="check-circle" href="/evaluation/overview">
+    Deep dive into evaluation strategies
+  </Card>
+</CardGroup>

@@ -1,0 +1,266 @@
+---
+title: 'Response Caching'
+description: 'Reduce API costs by up to 90% with intelligent response caching'
+---
+
+## Overview
+
+Helicone's caching feature stores and reuses responses from previous API requests, dramatically reducing costs and latency. When a cached response is returned, you avoid making a new request to the AI provider entirely.
+
+<Info>
+Caching is particularly effective for:
+- Repeated queries (e.g., FAQ responses)
+- Static prompts with consistent outputs
+- Development and testing environments
+- High-traffic applications with common requests
+</Info>
+
+## Key Benefits
+
+<CardGroup cols={2}>
+  <Card title="Cost Reduction" icon="dollar-sign">
+    Save up to 90% on API costs by serving cached responses instead of making new requests
+  </Card>
+  <Card title="Lower Latency" icon="gauge">
+    Cached responses are returned instantly, reducing response times from seconds to milliseconds
+  </Card>
+  <Card title="Bucket Caching" icon="layer-group">
+    Store multiple variations of responses for the same prompt to maintain output diversity
+  </Card>
+  <Card title="Flexible TTL" icon="clock">
+    Control cache expiration with custom time-to-live settings from hours to months
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+Enable caching by adding the `Helicone-Cache-Enabled` header to your requests:
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { OpenAI } from "openai";
+
+    const client = new OpenAI({
+      baseURL: "https://ai-gateway.helicone.ai",
+      apiKey: process.env.HELICONE_API_KEY,
+      defaultHeaders: {
+        "Helicone-Cache-Enabled": "true",
+      },
+    });
+
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: "What is machine learning?" }],
+    });
+
+    // Check if response was cached
+    console.log(response.headers.get("Helicone-Cache")); // "HIT" or "MISS"
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    from openai import OpenAI
+
+    client = OpenAI(
+        base_url="https://ai-gateway.helicone.ai",
+        api_key=os.getenv("HELICONE_API_KEY"),
+        default_headers={
+            "Helicone-Cache-Enabled": "true",
+        },
+    )
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": "What is machine learning?"}]
+    )
+
+    # Check if response was cached
+    print(response.headers.get("Helicone-Cache"))  # "HIT" or "MISS"
+    ```
+  </Tab>
+  
+  <Tab title="cURL">
+    ```bash
+    curl https://ai-gateway.helicone.ai/chat/completions \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $HELICONE_API_KEY" \
+      -H "Helicone-Cache-Enabled: true" \
+      -d '{
+        "model": "gpt-4o-mini",
+        "messages": [{"role": "user", "content": "What is machine learning?"}]
+      }'
+    ```
+  </Tab>
+</Tabs>
+
+## Cache Headers
+
+### Basic Caching
+
+| Header | Value | Description |
+|--------|-------|-------------|
+| `Helicone-Cache-Enabled` | `true` | Enable both reading from and writing to cache |
+| `Helicone-Cache-Save` | `true` | Only save responses to cache (don't read) |
+| `Helicone-Cache-Read` | `true` | Only read from cache (don't save new responses) |
+
+### Advanced Options
+
+| Header | Value | Description |
+|--------|-------|-------------|
+| `Cache-Control` | `max-age=3600` | Set cache TTL in seconds (default: 7 days, max: 365 days) |
+| `Helicone-Cache-Bucket-Max-Size` | `5` | Number of response variations to cache (1-20) |
+| `Helicone-Cache-Seed` | `user-123` | Separate cache keys by custom identifier |
+
+## Bucket Caching
+
+Bucket caching stores multiple response variations for the same request, useful for non-deterministic outputs:
+
+```typescript
+const client = new OpenAI({
+  baseURL: "https://ai-gateway.helicone.ai",
+  apiKey: process.env.HELICONE_API_KEY,
+  defaultHeaders: {
+    "Helicone-Cache-Enabled": "true",
+    "Helicone-Cache-Bucket-Max-Size": "10",
+  },
+});
+
+const response = await client.chat.completions.create({
+  model: "gpt-4o-mini",
+  messages: [{ role: "user", content: "Tell me a joke" }],
+  temperature: 0.8, // Higher temperature = more variation
+});
+```
+
+<Note>
+With bucket caching enabled:
+1. The first 10 requests generate new responses and fill the cache bucket
+2. Subsequent requests randomly select from the 10 cached responses
+3. Users experience variety without the cost of new API calls
+</Note>
+
+## Cache Key Generation
+
+Helicone generates cache keys based on:
+
+- Request URL and endpoint
+- Request body (excluding ignored keys)
+- Authorization headers
+- Custom cache headers
+- Cache seed (if provided)
+
+### Ignoring Request Fields
+
+Exclude fields from cache key generation to cache similar requests together:
+
+```typescript
+const client = new OpenAI({
+  baseURL: "https://ai-gateway.helicone.ai",
+  apiKey: process.env.HELICONE_API_KEY,
+  defaultHeaders: {
+    "Helicone-Cache-Enabled": "true",
+    "Helicone-Cache-Ignore-Keys": JSON.stringify(["temperature", "max_tokens"]),
+  },
+});
+```
+
+## Cache Seeds
+
+Use cache seeds to segment caches by user, tenant, or environment:
+
+```typescript
+const getCachedResponse = async (userId: string) => {
+  const client = new OpenAI({
+    baseURL: "https://ai-gateway.helicone.ai",
+    apiKey: process.env.HELICONE_API_KEY,
+    defaultHeaders: {
+      "Helicone-Cache-Enabled": "true",
+      "Helicone-Cache-Seed": userId,
+    },
+  });
+
+  return await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Get my personalized summary" }],
+  });
+};
+```
+
+## TTL Configuration
+
+Control how long responses stay cached:
+
+```typescript
+const client = new OpenAI({
+  baseURL: "https://ai-gateway.helicone.ai",
+  apiKey: process.env.HELICONE_API_KEY,
+  defaultHeaders: {
+    "Helicone-Cache-Enabled": "true",
+    "Cache-Control": "max-age=86400", // 24 hours
+  },
+});
+```
+
+**Common TTL values:**
+- `max-age=3600` - 1 hour
+- `max-age=86400` - 1 day  
+- `max-age=604800` - 1 week (default)
+- `max-age=2592000` - 30 days
+
+## Cache Response Headers
+
+Helicone adds headers to indicate cache status:
+
+| Header | Value | Description |
+|--------|-------|-------------|
+| `Helicone-Cache` | `HIT` or `MISS` | Whether response was served from cache |
+| `Helicone-Cache-Bucket-Idx` | `3` | Which bucket index was used (for bucket caching) |
+| `Helicone-Cache-Latency` | `1523` | Original response latency in milliseconds |
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use appropriate TTLs">
+    Set shorter TTLs for dynamic content and longer TTLs for static responses:
+    - FAQ responses: 7-30 days
+    - News summaries: 1-6 hours
+    - Product descriptions: 7+ days
+    - Embeddings: 30+ days
+  </Accordion>
+
+  <Accordion title="Leverage bucket caching for variety">
+    For creative content or varied responses, use bucket caching with higher temperatures to maintain diversity while reducing costs.
+  </Accordion>
+
+  <Accordion title="Monitor cache hit rates">
+    Track the `Helicone-Cache` header in your logs to measure cache effectiveness and optimize your caching strategy.
+  </Accordion>
+
+  <Accordion title="Segment caches appropriately">
+    Use cache seeds to separate caches for different users, tenants, or environments when responses should be personalized.
+  </Accordion>
+
+  <Accordion title="Test cache behavior in development">
+    Use shorter TTLs and smaller bucket sizes during development to iterate quickly on cache configurations.
+  </Accordion>
+</AccordionGroup>
+
+## Limitations
+
+- Maximum cache TTL: 365 days
+- Maximum bucket size: 20 responses
+- Cache timeout: 2 seconds (falls back to fresh request if cache is slow)
+- Streaming responses are cached after completion
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card title="Rate Limiting" icon="gauge-high" href="/features/rate-limiting">
+    Control API usage with custom rate limits
+  </Card>
+  <Card title="Cost Tracking" icon="dollar-sign" href="/guides/cost-tracking">
+    Monitor spending and savings from caching
+  </Card>
+</CardGroup>

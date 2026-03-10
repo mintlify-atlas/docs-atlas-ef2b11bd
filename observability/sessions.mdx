@@ -1,0 +1,599 @@
+---
+title: "Sessions"
+sidebarTitle: "Sessions"
+description: "Track multi-step AI workflows by grouping related requests into sessions - perfect for agents, chatbots, and complex LLM pipelines"
+"twitter:title": "Sessions - Helicone OSS LLM Observability"
+---
+
+import QuestionsSection from "/snippets/questions-section.mdx";
+
+Sessions let you group related LLM requests together to trace complete AI workflows. When building agents or chatbots that make multiple API calls to accomplish a task, sessions provide a unified view showing how all the pieces fit together.
+
+<Frame caption="Session view showing a multi-step AI agent workflow">
+  <img
+    src="/images/sessions/helicone-session-ui.webp"
+    alt="Helicone session tracking interface showing hierarchical request structure"
+  />
+</Frame>
+
+## Why Use Sessions
+
+**Without sessions**, you see individual requests in isolation:
+- ❌ Hard to trace which requests belong to the same workflow
+- ❌ Can't measure total cost or latency for a task
+- ❌ Difficult to debug multi-step agent failures
+- ❌ No visibility into request dependencies
+
+**With sessions**, you get complete workflow visibility:
+- ✅ Group all related requests under one session ID
+- ✅ Visualize parent-child relationships with path hierarchy
+- ✅ Calculate total cost, latency, and token usage per session
+- ✅ Debug agent workflows by tracing the entire execution flow
+
+## Quick Start
+
+<Steps>
+<Step title="Add Session Headers">
+Include three required headers in your requests:
+
+```typescript
+import { randomUUID } from "crypto";
+import { OpenAI } from "openai";
+
+const client = new OpenAI({
+  baseURL: "https://ai-gateway.helicone.ai",
+  apiKey: process.env.HELICONE_API_KEY,
+});
+
+const sessionId = randomUUID();
+
+await client.chat.completions.create(
+  {
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Analyze this document..." }]
+  },
+  {
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Path": "/analyze",
+      "Helicone-Session-Name": "Document Analyzer"
+    }
+  }
+);
+```
+</Step>
+
+<Step title="Structure Your Paths">
+Use path syntax to represent parent-child relationships:
+
+```typescript
+// Parent request
+"/analyze"                      // Top-level analysis
+
+// Child requests
+"/analyze/extract"             // Extract key information
+"/analyze/summarize"           // Generate summary
+
+// Grandchild requests
+"/analyze/extract/validate"    // Validate extracted data
+```
+</Step>
+
+<Step title="View in Dashboard">
+Visit [helicone.ai/sessions](https://helicone.ai/sessions) to see your sessions:
+- View all sessions grouped by name
+- Click into a session to see the request hierarchy
+- Analyze session-level metrics (cost, duration, request count)
+- Filter by session name, date range, or properties
+</Step>
+</Steps>
+
+## Session Components
+
+### Session ID
+
+The unique identifier that groups requests together.
+
+**Best Practices:**
+- Use UUIDs for guaranteed uniqueness: `randomUUID()`
+- Generate a new ID for each workflow instance
+- Never reuse session IDs across different workflows
+
+```typescript
+import { randomUUID } from "crypto";
+
+// ✅ Good - unique ID per workflow
+const sessionId = randomUUID();
+
+// ❌ Bad - hardcoded ID reused across workflows
+const sessionId = "my-session";
+```
+
+### Session Path
+
+Represents the hierarchical structure of your workflow.
+
+**Path Rules:**
+- Start with `/` (forward slash)
+- Use `/` to separate levels: `/parent/child/grandchild`
+- Group by function, not time
+- Same conceptual work = same path
+
+**Path Design Philosophy:**
+
+Paths represent **what** the request does, not **when** it happens. Multiple requests can share the same path if they perform the same type of work.
+
+```typescript
+// ✅ Good - grouped by function
+"/workflow"                    // Main workflow
+"/workflow/research"           // Research phase
+"/workflow/research/search"    // Web search (may happen multiple times)
+"/workflow/analyze"            // Analysis phase
+"/workflow/generate"           // Generation phase
+
+// ❌ Bad - sequential numbering
+"/step1"
+"/step2" 
+"/step3"
+```
+
+**Why group by function?**
+
+In the session timeline, requests with the same path are colored the same. This helps you:
+- Identify patterns (e.g., "all search operations are slow")
+- See when different phases occur in the workflow
+- Compare durations across similar operations
+
+### Session Name
+
+High-level grouping for filtering and organization.
+
+**Best Practices:**
+- Use descriptive names that describe the workflow type
+- Keep the same name across all requests in the session
+- Use session names to filter in the dashboard
+
+```typescript
+// Good session names
+"Customer Support Chat"
+"Research Agent"
+"Content Generator"
+"Document Analyzer"
+"Trip Planning Assistant"
+
+// Use consistent names to group similar workflows
+const sessionName = "Customer Support Chat"; // Same for all support sessions
+```
+
+## Session Patterns
+
+### AI Agent Workflow
+
+Track a multi-step agent that performs research and analysis:
+
+<CodeGroup>
+```typescript TypeScript
+import { randomUUID } from "crypto";
+import { OpenAI } from "openai";
+
+const client = new OpenAI({
+  baseURL: "https://ai-gateway.helicone.ai",
+  apiKey: process.env.HELICONE_API_KEY,
+});
+
+const sessionId = randomUUID();
+const sessionName = "Research Agent";
+
+// Step 1: Research phase
+const research = await client.chat.completions.create(
+  {
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Research the topic of quantum computing" }]
+  },
+  {
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Path": "/research",
+      "Helicone-Session-Name": sessionName
+    }
+  }
+);
+
+// Step 2: Extract key facts
+const facts = await client.chat.completions.create(
+  {
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Extract key facts from this research: ..." }]
+  },
+  {
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Path": "/research/extract",
+      "Helicone-Session-Name": sessionName
+    }
+  }
+);
+
+// Step 3: Analyze findings
+const analysis = await client.chat.completions.create(
+  {
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Analyze these facts: ..." }]
+  },
+  {
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Path": "/research/analyze",
+      "Helicone-Session-Name": sessionName
+    }
+  }
+);
+
+// Step 4: Generate report
+const report = await client.chat.completions.create(
+  {
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Create a report from this analysis: ..." }]
+  },
+  {
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Path": "/research/analyze/report",
+      "Helicone-Session-Name": sessionName
+    }
+  }
+);
+```
+
+```python Python
+import uuid
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://ai-gateway.helicone.ai",
+    api_key=os.environ.get("HELICONE_API_KEY"),
+)
+
+session_id = str(uuid.uuid4())
+session_name = "Research Agent"
+
+# Step 1: Research phase
+research = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[{"role": "user", "content": "Research the topic of quantum computing"}],
+    extra_headers={
+        "Helicone-Session-Id": session_id,
+        "Helicone-Session-Path": "/research",
+        "Helicone-Session-Name": session_name
+    }
+)
+
+# Step 2: Extract key facts
+facts = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[{"role": "user", "content": "Extract key facts from this research: ..."}],
+    extra_headers={
+        "Helicone-Session-Id": session_id,
+        "Helicone-Session-Path": "/research/extract",
+        "Helicone-Session-Name": session_name
+    }
+)
+
+# Step 3: Analyze findings
+analysis = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[{"role": "user", "content": "Analyze these facts: ..."}],
+    extra_headers={
+        "Helicone-Session-Id": session_id,
+        "Helicone-Session-Path": "/research/analyze",
+        "Helicone-Session-Name": session_name
+    }
+)
+
+# Step 4: Generate report
+report = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[{"role": "user", "content": "Create a report from this analysis: ..."}],
+    extra_headers={
+        "Helicone-Session-Id": session_id,
+        "Helicone-Session-Path": "/research/analyze/report",
+        "Helicone-Session-Name": session_name
+    }
+)
+```
+</CodeGroup>
+
+### Multi-turn Chatbot
+
+Track a conversation with multiple back-and-forth exchanges:
+
+```typescript
+const sessionId = randomUUID();
+const sessionName = "Customer Support";
+
+// User's first question
+await client.chat.completions.create(
+  {
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: "You are a helpful support agent." },
+      { role: "user", content: "How do I reset my password?" }
+    ]
+  },
+  {
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Path": "/question",
+      "Helicone-Session-Name": sessionName,
+      "Helicone-Property-Topic": "password_reset"
+    }
+  }
+);
+
+// User's follow-up question
+await client.chat.completions.create(
+  {
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: "You are a helpful support agent." },
+      { role: "user", content: "How do I reset my password?" },
+      { role: "assistant", content: "You can reset your password by..." },
+      { role: "user", content: "I didn't receive the email" }
+    ]
+  },
+  {
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Path": "/question",
+      "Helicone-Session-Name": sessionName,
+      "Helicone-Property-Topic": "password_reset"
+    }
+  }
+);
+```
+
+### Parallel Operations
+
+Track multiple parallel operations in a workflow:
+
+```typescript
+const sessionId = randomUUID();
+const sessionName = "Content Generator";
+
+// Generate multiple variations in parallel
+const variations = await Promise.all([
+  client.chat.completions.create(
+    { /* request */ },
+    {
+      headers: {
+        "Helicone-Session-Id": sessionId,
+        "Helicone-Session-Path": "/generate/variation",
+        "Helicone-Session-Name": sessionName,
+        "Helicone-Property-Variation": "A"
+      }
+    }
+  ),
+  client.chat.completions.create(
+    { /* request */ },
+    {
+      headers: {
+        "Helicone-Session-Id": sessionId,
+        "Helicone-Session-Path": "/generate/variation",
+        "Helicone-Session-Name": sessionName,
+        "Helicone-Property-Variation": "B"
+      }
+    }
+  ),
+  client.chat.completions.create(
+    { /* request */ },
+    {
+      headers: {
+        "Helicone-Session-Id": sessionId,
+        "Helicone-Session-Path": "/generate/variation",
+        "Helicone-Session-Name": sessionName,
+        "Helicone-Property-Variation": "C"
+      }
+    }
+  )
+]);
+
+// Select best variation
+await client.chat.completions.create(
+  { /* request */ },
+  {
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Path": "/generate/select",
+      "Helicone-Session-Name": sessionName
+    }
+  }
+);
+```
+
+## Session Metrics
+
+Helicone automatically calculates metrics for each session:
+
+- **Total Cost**: Sum of all request costs in the session
+- **Duration**: Time from first to last request
+- **Request Count**: Number of requests in the session
+- **Total Tokens**: Combined prompt and completion tokens
+- **Average Latency**: Mean latency across all requests
+- **Status**: Success if all requests succeeded, otherwise failed
+
+## Querying Sessions
+
+Retrieve session data via the REST API:
+
+### Get All Sessions
+
+```bash
+curl --request POST \
+  --url https://api.helicone.ai/v1/session/query \
+  --header "Content-Type: application/json" \
+  --header "Authorization: Bearer $HELICONE_API_KEY" \
+  --data '{
+  "search": "",
+  "timeFilter": {
+    "startTimeUnixMs": 1709222400000,
+    "endTimeUnixMs": 1709308800000
+  },
+  "timezoneDifference": 0,
+  "filter": "all",
+  "limit": 100
+}'
+```
+
+### Filter by Session Name
+
+```bash
+curl --request POST \
+  --url https://api.helicone.ai/v1/session/query \
+  --header "Content-Type: application/json" \
+  --header "Authorization: Bearer $HELICONE_API_KEY" \
+  --data '{
+  "search": "",
+  "timeFilter": {
+    "startTimeUnixMs": 1709222400000,
+    "endTimeUnixMs": 1709308800000
+  },
+  "nameEquals": "Research Agent",
+  "timezoneDifference": 0,
+  "filter": "all",
+  "limit": 100
+}'
+```
+
+### Get Session Metrics
+
+```bash
+curl --request POST \
+  --url https://api.helicone.ai/v1/session/metrics/query \
+  --header "Content-Type: application/json" \
+  --header "Authorization: Bearer $HELICONE_API_KEY" \
+  --data '{
+  "nameContains": "Research",
+  "timezoneDifference": 0
+}'
+```
+
+## Combining with Custom Properties
+
+Add custom properties to session requests for richer filtering:
+
+```typescript
+const sessionId = randomUUID();
+
+await client.chat.completions.create(
+  { /* request */ },
+  {
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Path": "/research",
+      "Helicone-Session-Name": "Research Agent",
+      // Add custom properties
+      "Helicone-Property-Environment": "production",
+      "Helicone-Property-Topic": "quantum_computing",
+      "Helicone-Property-Priority": "high",
+      "Helicone-User-Id": "user-123"
+    }
+  }
+);
+```
+
+Then filter sessions by these properties in the dashboard or API.
+
+## Best Practices
+
+### Session ID Management
+
+✅ **Do:**
+- Generate a new UUID for each workflow instance
+- Store the session ID if you need to reference it later
+- Use the same session ID for all related requests
+
+❌ **Don't:**
+- Reuse session IDs across different workflows
+- Use predictable or sequential IDs
+- Change session IDs mid-workflow
+
+### Path Structure
+
+✅ **Do:**
+- Keep paths concise and descriptive
+- Group by functionality, not by time
+- Use consistent naming conventions
+- Plan your hierarchy before implementing
+
+❌ **Don't:**
+- Use overly deep hierarchies (>5 levels)
+- Include timestamps or IDs in paths
+- Change path structure mid-session
+- Use special characters or spaces
+
+### Session Names
+
+✅ **Do:**
+- Use descriptive, human-readable names
+- Keep the same name for similar workflows
+- Use names that make filtering easy
+
+❌ **Don't:**
+- Include IDs or timestamps in names
+- Use generic names like "Session" or "Request"
+- Change names mid-workflow
+
+## Troubleshooting
+
+### Requests Not Grouping
+
+**Problem**: Requests aren't appearing in the same session.
+
+**Solutions**:
+- Verify all requests use the exact same session ID
+- Check that session headers are included in every request
+- Ensure session ID is a string, not an object
+
+### Missing Session Hierarchy
+
+**Problem**: Session shows requests but not the tree structure.
+
+**Solutions**:
+- Verify all requests have the `Helicone-Session-Path` header
+- Check that paths start with `/`
+- Ensure paths follow parent/child structure
+
+### Sessions Not Appearing in Dashboard
+
+**Problem**: Sessions aren't visible in the dashboard.
+
+**Solutions**:
+- Check that all three headers are included:
+  - `Helicone-Session-Id`
+  - `Helicone-Session-Path`
+  - `Helicone-Session-Name`
+- Verify requests are successfully logged (check Requests page)
+- Wait a few seconds for data to propagate
+
+## Related Features
+
+<CardGroup cols={2}>
+<Card title="Requests" icon="file-lines" href="/observability/requests">
+View individual requests within your sessions
+</Card>
+
+<Card title="Custom Properties" icon="tags" href="/observability/custom-properties">
+Add metadata to session requests for filtering
+</Card>
+
+<Card title="Traces" icon="bezier-curve" href="/observability/traces">
+Log non-LLM operations within your sessions
+</Card>
+
+<Card title="Session API" icon="code" href="/rest/session/post-v1sessionquery">
+Query sessions programmatically via REST API
+</Card>
+</CardGroup>
+
+<QuestionsSection />

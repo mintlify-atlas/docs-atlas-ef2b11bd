@@ -1,0 +1,211 @@
+---
+title: 'Update Prompt'
+api: 'POST /v1/prompt-2025/update'
+description: 'Create a new version of an existing prompt'
+---
+
+Creates a new version of an existing prompt. You can create either a minor version (incremental updates) or a major version (breaking changes).
+
+## Request Body
+
+<ParamField body="promptId" type="string" required>
+  The unique identifier of the prompt to update
+</ParamField>
+
+<ParamField body="promptVersionId" type="string" required>
+  The version ID to base the new version on
+</ParamField>
+
+<ParamField body="newMajorVersion" type="boolean" required>
+  Whether to create a new major version (true) or minor version (false)
+</ParamField>
+
+<ParamField body="commitMessage" type="string" required>
+  Description of the changes in this version
+</ParamField>
+
+<ParamField body="environment" type="string">
+  Optional environment to associate with this version (e.g., "production", "staging")
+</ParamField>
+
+<ParamField body="promptBody" type="object" required>
+  The updated prompt content in OpenAI chat format
+  
+  <Expandable title="Prompt Body">
+    <ParamField body="model" type="string">
+      The model to use
+    </ParamField>
+    
+    <ParamField body="messages" type="array">
+      Array of message objects with role and content
+    </ParamField>
+    
+    <ParamField body="temperature" type="number">
+      Sampling temperature (0-2)
+    </ParamField>
+    
+    <ParamField body="top_p" type="number">
+      Nucleus sampling parameter
+    </ParamField>
+    
+    <ParamField body="max_tokens" type="number">
+      Maximum tokens to generate
+    </ParamField>
+    
+    <ParamField body="tools" type="array">
+      Array of tool/function definitions
+    </ParamField>
+    
+    <ParamField body="tool_choice" type="string | object">
+      Controls which tool to call
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="data" type="object">
+  <ResponseField name="id" type="string">
+    The unique identifier for the new version
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="error" type="string | null">
+  Error message if the request failed, null otherwise
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.helicone.ai/v1/prompt-2025/update \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "promptId": "prompt_abc123xyz",
+    "promptVersionId": "version_def456uvw",
+    "newMajorVersion": false,
+    "commitMessage": "Updated temperature and added max_tokens",
+    "environment": "production",
+    "promptBody": {
+      "model": "gpt-4o",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful customer support agent. Be polite and professional."
+        },
+        {
+          "role": "user",
+          "content": "{{user_question}}"
+        }
+      ],
+      "temperature": 0.5,
+      "max_tokens": 750
+    }
+  }'
+```
+
+```typescript TypeScript
+const response = await fetch('https://api.helicone.ai/v1/prompt-2025/update', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    promptId: 'prompt_abc123xyz',
+    promptVersionId: 'version_def456uvw',
+    newMajorVersion: false,
+    commitMessage: 'Updated temperature and added max_tokens',
+    environment: 'production',
+    promptBody: {
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a helpful customer support agent. Be polite and professional.',
+        },
+        {
+          role: 'user',
+          content: '{{user_question}}',
+        },
+      ],
+      temperature: 0.5,
+      max_tokens: 750,
+    },
+  }),
+});
+
+const result = await response.json();
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    'https://api.helicone.ai/v1/prompt-2025/update',
+    headers={
+        'Authorization': 'Bearer YOUR_API_KEY',
+        'Content-Type': 'application/json',
+    },
+    json={
+        'promptId': 'prompt_abc123xyz',
+        'promptVersionId': 'version_def456uvw',
+        'newMajorVersion': False,
+        'commitMessage': 'Updated temperature and added max_tokens',
+        'environment': 'production',
+        'promptBody': {
+            'model': 'gpt-4o',
+            'messages': [
+                {
+                    'role': 'system',
+                    'content': 'You are a helpful customer support agent. Be polite and professional.',
+                },
+                {
+                    'role': 'user',
+                    'content': '{{user_question}}',
+                },
+            ],
+            'temperature': 0.5,
+            'max_tokens': 750,
+        },
+    },
+)
+
+result = response.json()
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 Success
+{
+  "data": {
+    "id": "version_ghi789rst"
+  },
+  "error": null
+}
+```
+
+```json 500 Error
+{
+  "data": null,
+  "error": "Failed to create new version"
+}
+```
+</ResponseExample>
+
+## Version Management
+
+### Minor Versions
+Set `newMajorVersion: false` for incremental updates:
+- Bug fixes
+- Small improvements
+- Configuration tweaks
+
+Example: 1.0 → 1.1 → 1.2
+
+### Major Versions
+Set `newMajorVersion: true` for breaking changes:
+- Complete rewrites
+- Structural changes
+- Different model or approach
+
+Example: 1.5 → 2.0 → 3.0

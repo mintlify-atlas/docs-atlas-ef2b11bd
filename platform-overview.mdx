@@ -1,0 +1,560 @@
+---
+title: "Platform Overview"
+sidebarTitle: "Platform Overview"
+description: "Understand Helicone's architecture and how the AI Gateway, observability platform, and core services work together"
+"twitter:title": "Platform Overview - Helicone Architecture"
+---
+
+Now that your requests are flowing through Helicone, let's explore the platform architecture and understand how everything works together.
+
+## Architecture Overview
+
+Helicone is comprised of **five core services** that work together to provide AI Gateway and observability capabilities:
+
+<Frame>
+  <div style={{background: "#f9fafb", padding: "2rem", borderRadius: "8px", fontFamily: "monospace"}}>
+    <pre style={{margin: 0, fontSize: "14px"}}>
+{`
+┌─────────────────────────────────────────────────────────────┐
+│                        User Request                         │
+│                             ↓                               │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│  Worker (Cloudflare)                                        │
+│  • Edge proxy for LLM requests                              │
+│  • Routes to 100+ providers                                 │
+│  • <50ms overhead                                           │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+        ┌─────────────────────┴─────────────────────┐
+        ↓                                           ↓
+┌──────────────────────┐                 ┌─────────────────────┐
+│   LLM Providers      │                 │   Jawn (API)        │
+│   • OpenAI           │                 │   • Log collection  │
+│   • Anthropic        │────logs────────→│   • Request storage │
+│   • Google, etc.     │                 │   • API endpoints   │
+└──────────────────────┘                 └─────────────────────┘
+                                                   ↓
+                          ┌────────────────────────┼────────────────────────┐
+                          ↓                        ↓                        ↓
+                ┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
+                │  Supabase        │    │  ClickHouse      │    │  MinIO           │
+                │  • Auth          │    │  • Analytics     │    │  • Request bodies│
+                │  • Metadata      │    │  • Time series   │    │  • Response logs │
+                │  • User data     │    │  • Aggregations  │    │  • Object storage│
+                └──────────────────┘    └──────────────────┘    └──────────────────┘
+                          ↑                        ↑                        ↑
+                          └────────────────────────┼────────────────────────┘
+                                                   ↓
+                                         ┌─────────────────────┐
+                                         │  Web (Next.js)      │
+                                         │  • Dashboard UI     │
+                                         │  • Request viewer   │
+                                         │  • Analytics        │
+                                         └─────────────────────┘
+`}
+    </pre>
+  </div>
+</Frame>
+
+## Core Components
+
+<Tabs>
+  <Tab title="Worker">
+    ### Worker (Cloudflare Workers)
+    
+    The **Worker** is the edge proxy that intercepts and routes all LLM requests. It's deployed globally on Cloudflare's edge network for minimal latency.
+    
+    **Key responsibilities:**
+    - Route requests to 100+ LLM providers
+    - Apply intelligent fallbacks when providers fail
+    - Enforce rate limits and caching rules
+    - Log request metadata to Jawn
+    - Add &lt;50ms overhead on average
+    
+    **Code location:** `/worker`
+    
+    **How it works:**
+    ```typescript
+    // Simplified worker flow
+    export default {
+      async fetch(request: Request) {
+        // 1. Parse Helicone headers
+        const heliconeAuth = request.headers.get("Helicone-Auth");
+        
+        // 2. Determine target provider and model
+        const { provider, model } = parseModel(body.model);
+        
+        // 3. Route to correct provider
+        const providerResponse = await routeToProvider({
+          provider,
+          model,
+          request,
+        });
+        
+        // 4. Log request/response to Jawn
+        await logToJawn({
+          request,
+          response: providerResponse,
+          metadata: { cost, tokens, latency },
+        });
+        
+        // 5. Return provider response
+        return providerResponse;
+      },
+    };
+    ```
+    
+    **Deployment:**
+    - Hosted on Cloudflare Workers (cloud)
+    - Runs locally with `wrangler dev` (self-hosted)
+  </Tab>
+  
+  <Tab title="Jawn">
+    ### Jawn (Express + TypeScript)
+    
+    **Jawn** is the dedicated API server for collecting logs, serving data to the web dashboard, and handling all backend operations.
+    
+    **Key responsibilities:**
+    - Receive logs from Worker and SDKs
+    - Store request metadata in Supabase
+    - Write analytics to ClickHouse
+    - Upload request/response bodies to MinIO
+    - Serve REST API for dashboard
+    
+    **Code location:** `/valhalla/jawn`
+    
+    **Architecture:**
+    ```
+    jawn/
+    ├── src/
+    │   ├── controllers/    # REST API endpoints
+    │   ├── managers/       # Business logic
+    │   ├── lib/
+    │   │   ├── stores/     # Database operations
+    │   │   ├── clients/    # External services (S3, etc.)
+    │   │   └── wrappers/   # Database wrappers
+    │   └── tsoa-build/     # Auto-generated types
+    ```
+    
+    **Example API flow:**
+    ```typescript
+    // controllers/requestController.ts
+    @Post("/request")
+    public async logRequest(
+      @Body() requestBody: LogRequest
+    ): Promise<void> {
+      // 1. Validate request
+      const validated = await this.validateRequest(requestBody);
+      
+      // 2. Store in Supabase (metadata)
+      await this.requestStore.insertRequest(validated);
+      
+      // 3. Store in ClickHouse (analytics)
+      await this.clickhouseClient.insertRequest(validated);
+      
+      // 4. Store bodies in MinIO (S3)
+      await this.s3Client.uploadRequestBody(validated);
+    }
+    ```
+    
+    **Tech stack:**
+    - Express.js with TSOA for API generation
+    - Supabase for auth and metadata
+    - ClickHouse for analytics
+    - MinIO/S3 for object storage
+  </Tab>
+  
+  <Tab title="Web">
+    ### Web (Next.js)
+    
+    The **Web** frontend is the dashboard UI where you view requests, analyze costs, debug sessions, and manage your account.
+    
+    **Key features:**
+    - Request logs with filtering and search
+    - Session trees for agent debugging
+    - Cost analytics and usage charts
+    - Prompt management interface
+    - User and organization settings
+    
+    **Code location:** `/web`
+    
+    **Tech stack:**
+    - Next.js 14 (App Router)
+    - React with TypeScript
+    - TailwindCSS for styling
+    - TanStack Query for data fetching
+    - Recharts for analytics
+    
+    **Key pages:**
+    ```
+    web/app/
+    ├── (authenticated)/
+    │   ├── requests/          # Request logs
+    │   ├── sessions/          # Session debugging
+    │   ├── dashboard/         # Analytics overview
+    │   ├── prompts/           # Prompt management
+    │   └── settings/          # Account settings
+    ```
+  </Tab>
+  
+  <Tab title="Data Layer">
+    ### Data Storage
+    
+    Helicone uses three different storage systems optimized for different data types:
+    
+    **Supabase (PostgreSQL)**
+    - User accounts and authentication
+    - Organization data
+    - API keys and settings
+    - Request metadata (IDs, timestamps, user mapping)
+    - Prompt versions
+    
+    **ClickHouse**
+    - Time-series analytics data
+    - Request metrics (cost, tokens, latency)
+    - Aggregations for dashboard charts
+    - Fast queries on millions of requests
+    
+    **MinIO (S3-compatible)**
+    - Full request bodies
+    - Full response bodies
+    - Large payloads (images, embeddings)
+    - Archived logs
+    
+    **Why three systems?**
+    - **Supabase**: ACID transactions for critical data
+    - **ClickHouse**: Columnar storage for analytics
+    - **MinIO**: Cost-effective object storage
+    
+    This separation allows Helicone to scale efficiently while keeping costs low.
+  </Tab>
+</Tabs>
+
+## Request Flow
+
+Let's trace a complete request through the system:
+
+<Steps>
+  <Step title="User sends LLM request">
+    Your application sends a request to the Helicone AI Gateway:
+    
+    ```typescript
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: "Hello!" }],
+    });
+    ```
+  </Step>
+  
+  <Step title="Worker routes to provider">
+    The Worker (Cloudflare edge):
+    - Authenticates the request
+    - Determines target provider (OpenAI)
+    - Applies any caching or rate limit rules
+    - Forwards request to OpenAI
+    - Receives response
+  </Step>
+  
+  <Step title="Provider responds">
+    OpenAI processes the request and returns the completion.
+    
+    The Worker:
+    - Calculates cost and token usage
+    - Streams response back to user (if streaming)
+    - Logs request metadata to Jawn
+  </Step>
+  
+  <Step title="Jawn stores data">
+    Jawn receives the log and:
+    - Stores metadata in Supabase (request ID, user, timestamp)
+    - Writes metrics to ClickHouse (cost, tokens, latency)
+    - Uploads request/response to MinIO (full bodies)
+  </Step>
+  
+  <Step title="Dashboard displays">
+    The Web dashboard:
+    - Queries Jawn API for request list
+    - Displays in real-time (&lt;5 seconds)
+    - Loads full details on click from MinIO
+  </Step>
+</Steps>
+
+## Key Features Enabled by Architecture
+
+<CardGroup cols={2}>
+  <Card title="Edge Routing" icon="globe">
+    Worker on Cloudflare edge means:
+    - &lt;50ms latency overhead
+    - Global availability
+    - Automatic failover
+    - DDoS protection
+  </Card>
+  
+  <Card title="Scalable Analytics" icon="chart-line">
+    ClickHouse columnar storage:
+    - Query millions of requests
+    - Real-time aggregations
+    - Cost-effective at scale
+    - Sub-second dashboard loads
+  </Card>
+  
+  <Card title="Flexible Storage" icon="database">
+    Tiered storage approach:
+    - Hot data in Supabase
+    - Analytics in ClickHouse
+    - Bodies in S3/MinIO
+    - Optimized costs
+  </Card>
+  
+  <Card title="Multi-Provider" icon="network-wired">
+    Worker intelligence:
+    - 100+ provider integrations
+    - Automatic fallbacks
+    - Smart load balancing
+    - Unified observability
+  </Card>
+</CardGroup>
+
+## Self-Hosting Options
+
+Helicone is fully open source and can be self-hosted in multiple ways:
+
+<Tabs>
+  <Tab title="Docker (Easiest)">
+    ### All-in-One Docker Container
+    
+    Run everything in a single container for testing or small deployments:
+    
+    ```bash
+    docker pull helicone/helicone-all-in-one:latest
+    docker run -d \
+      --name helicone \
+      -p 3000:3000 \
+      -p 8585:8585 \
+      -p 9080:9080 \
+      helicone/helicone-all-in-one:latest
+    ```
+    
+    **Ports:**
+    - `3000` - Web dashboard
+    - `8585` - Jawn API + LLM proxy
+    - `9080` - MinIO S3 storage
+    
+    **Perfect for:**
+    - Local development
+    - Testing integrations
+    - Small teams
+  </Tab>
+  
+  <Tab title="Docker Compose">
+    ### Docker Compose (Recommended)
+    
+    Run all services separately for production-like setup:
+    
+    ```bash
+    git clone https://github.com/Helicone/helicone.git
+    cd helicone/docker
+    cp .env.example .env
+    docker compose up
+    ```
+    
+    **Services included:**
+    - Web (Next.js)
+    - Jawn (API server)
+    - Worker (proxy)
+    - Supabase (auth + DB)
+    - ClickHouse (analytics)
+    - MinIO (object storage)
+    
+    **Benefits:**
+    - Full production stack
+    - Easy to scale individual services
+    - Standard Docker tooling
+  </Tab>
+  
+  <Tab title="Kubernetes/Helm">
+    ### Production Helm Chart
+    
+    For enterprise deployments, we provide a production-ready Helm chart with:
+    
+    - Horizontal pod autoscaling
+    - High availability configurations
+    - Persistent volume management
+    - Ingress and TLS setup
+    - Resource limits and monitoring
+    
+    **Contact:** enterprise@helicone.ai for Helm chart access
+    
+    **Ideal for:**
+    - Enterprise production deployments
+    - Multi-region setups
+    - Large-scale self-hosted installations
+  </Tab>
+</Tabs>
+
+## Development Setup
+
+Want to contribute or customize Helicone? Here's the local development setup:
+
+<AccordionGroup>
+  <Accordion title="Requirements">
+    - **Docker** - For infrastructure (Postgres, ClickHouse, MinIO)
+    - **Node.js 20+** - Use nvm to manage versions
+    - **Yarn** - Package manager
+    - **Supabase CLI** - For database management
+    - **Wrangler** - For Cloudflare Worker development
+  </Accordion>
+  
+  <Accordion title="Quick Start">
+    ```bash
+    # Clone the repo
+    git clone https://github.com/Helicone/helicone.git
+    cd helicone
+    
+    # Install dependencies
+    nvm install 20 && nvm use 20
+    npm install -g yarn wrangler
+    yarn install
+    
+    # Set up environment
+    cp .env.example .env
+    supabase start
+    
+    # Start infrastructure
+    cd docker
+    docker compose -f docker-compose-local.yml up -d
+    
+    # Start services (3 terminals)
+    cd valhalla/jawn && yarn dev    # Terminal 1
+    cd web && yarn dev:local         # Terminal 2
+    cd worker && yarn dev            # Terminal 3
+    ```
+    
+    **Access:**
+    - Web: http://localhost:3000
+    - Jawn API: http://localhost:8585
+    - Worker: http://localhost:8787
+  </Accordion>
+  
+  <Accordion title="Project Structure">
+    ```
+    helicone/
+    ├── web/                    # Next.js dashboard
+    ├── worker/                 # Cloudflare Worker proxy
+    ├── valhalla/jawn/          # API server
+    ├── packages/
+    │   ├── cost/              # Cost calculation registry
+    │   ├── llm-mapper/        # Provider mappings
+    │   └── prompts/           # Prompt templates
+    ├── supabase/              # Database migrations
+    ├── clickhouse/            # Analytics schema
+    ├── docker/                # Docker configs
+    ├── examples/              # Integration examples
+    └── docs/                  # This documentation
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Security & Compliance
+
+<CardGroup cols={2}>
+  <Card title="SOC 2 Compliant" icon="certificate">
+    Type II certified for cloud hosting. Enterprise-grade security controls and annual audits.
+  </Card>
+  
+  <Card title="GDPR Compliant" icon="shield">
+    Full GDPR compliance with data residency options and user data controls.
+  </Card>
+  
+  <Card title="Data Encryption" icon="lock">
+    - TLS 1.3 in transit
+    - AES-256 at rest
+    - Encrypted backups
+  </Card>
+  
+  <Card title="Data Ownership" icon="user-shield">
+    - You own your data
+    - Export anytime via API
+    - Self-host for complete control
+  </Card>
+</CardGroup>
+
+## Performance Characteristics
+
+<Tabs>
+  <Tab title="Latency">
+    **Edge routing keeps overhead minimal:**
+    
+    - **p50**: &lt;25ms added latency
+    - **p95**: &lt;50ms added latency
+    - **p99**: &lt;100ms added latency
+    
+    The Worker runs on Cloudflare's edge (300+ locations), so requests are routed from the nearest location to the provider.
+  </Tab>
+  
+  <Tab title="Scalability">
+    **Handles production workloads:**
+    
+    - **Requests**: Millions per day
+    - **Concurrent users**: 10,000+
+    - **Dashboard queries**: Sub-second on 100M+ requests
+    - **Storage**: Grows linearly with usage
+    
+    ClickHouse provides efficient analytics at scale, and S3/MinIO keeps storage costs low.
+  </Tab>
+  
+  <Tab title="Availability">
+    **Built for reliability:**
+    
+    - **Uptime**: 99.9%+ SLA
+    - **Edge failover**: Automatic
+    - **Provider fallback**: Configurable
+    - **Data replication**: Multi-region
+    
+    If a provider goes down, automatic fallbacks keep your app online.
+  </Tab>
+</Tabs>
+
+## What's Next?
+
+Now that you understand how Helicone works, explore the features:
+
+<CardGroup cols={2}>
+  <Card
+    title="Sessions & Agent Debugging" 
+    href="/features/sessions"
+    icon="git-branch"
+  >
+    Track multi-step AI workflows with session trees
+  </Card>
+  
+  <Card
+    title="Gateway Fallbacks" 
+    href="/getting-started/integration-method/gateway-fallbacks"
+    icon="shield"
+  >
+    Configure automatic failover when providers go down
+  </Card>
+  
+  <Card
+    title="Prompt Management" 
+    href="/features/prompts"
+    icon="wand-magic-sparkles"
+  >
+    Version control and deploy prompts without code
+  </Card>
+  
+  <Card
+    title="Cost Tracking" 
+    href="/guides/cookbooks/cost-tracking"
+    icon="chart-bar"
+  >
+    Understand your LLM economics by user or feature
+  </Card>
+</CardGroup>
+
+## Questions?
+
+Join our [Discord](https://discord.com/invite/HwUbV3Q8qz) or email [help@helicone.ai](mailto:help@helicone.ai) for support.

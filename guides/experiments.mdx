@@ -1,0 +1,433 @@
+---
+title: "Running LLM Experiments"
+description: "A/B test prompts, models, and parameters with production data to continuously improve response quality"
+sidebarTitle: "Experiments"
+---
+
+<Warning>
+  We are deprecating the Experiments feature and it will be removed from the platform on September 1st, 2025. We recommend using [Prompt Versions](/prompts/overview) for testing prompt changes.
+</Warning>
+
+Experiments let you test changes to prompts, models, and parameters before deploying to production. Run experiments on historical data to validate improvements and prevent quality regressions.
+
+## Why Run Experiments?
+
+<CardGroup cols={2}>
+  <Card title="Test Safely" icon="shield-halved">
+    Validate changes without impacting production users
+  </Card>
+  <Card title="Data-Driven Decisions" icon="chart-line">
+    Compare outputs side-by-side with metrics
+  </Card>
+  <Card title="Save Costs" icon="dollar-sign">
+    Test on specific datasets instead of full production traffic
+  </Card>
+  <Card title="Prevent Regressions" icon="triangle-exclamation">
+    Catch quality issues before they reach users
+  </Card>
+</CardGroup>
+
+## Experiment Workflow
+
+<Steps>
+  <Step title="Navigate to Prompts">
+    Go to the [Prompts tab](https://www.helicone.ai/prompts) in your Helicone dashboard and select the prompt you want to test.
+
+    <Tip>
+      To experiment on your production prompt, look for the `production` tag.
+    </Tip>
+  </Step>
+
+  <Step title="Start a New Experiment">
+    Click **"Start Experiment"** in the top right corner.
+
+    <Frame caption="Start button to initiate a new prompt experiment">
+      <img src="/images/use-cases/experiments/start-button.png" alt="Start Experiment button in the Prompts tab"/>
+    </Frame>
+  </Step>
+
+  <Step title="Select Base Prompt">
+    Choose the baseline prompt to compare against. This is typically your current production prompt.
+
+    <Frame caption="Selecting a base prompt for comparison">
+      <img src="/images/use-cases/experiments/select-prompt.png" alt="Prompt selection interface for experiments"/>
+    </Frame>
+  </Step>
+
+  <Step title="Edit the Prompt">
+    Make your changes. This creates a new version without affecting the original prompt.
+
+    <Frame caption="Editing a prompt variant for testing">
+      <img src="/images/use-cases/experiments/edit-prompt.png" alt="Prompt editor showing variant being tested"/>
+    </Frame>
+
+    Common changes to test:
+    - Different instructions or tone
+    - More/fewer examples
+    - System prompt modifications
+    - Response format changes
+  </Step>
+
+  <Step title="Configure Experiment Settings">
+    Set up your test parameters:
+
+    - **Dataset** - Select existing dataset or generate random samples
+    - **Model** - Same as baseline or test a different model
+    - **Provider Keys** - Which API keys to use
+
+    <Tip>
+      Click **"Generate random dataset"** to create a dataset from up to 10 random production requests. Great for quick tests!
+    </Tip>
+
+    <Frame caption="Experiment configuration with dataset and model selection">
+      <img src="/images/use-cases/experiments/config.png" alt="Configuration interface for experiment parameters"/>
+    </Frame>
+  </Step>
+
+  <Step title="Review and Run">
+    The **Diff Viewer** shows exactly what changed between your base prompt and experiment variant.
+
+    <Frame caption="Diff viewer showing prompt changes">
+      <img src="/images/use-cases/experiments/confirm.png" alt="Side-by-side diff of base and experiment prompts"/>
+    </Frame>
+
+    Review the changes and click **"Run Experiment"** to start.
+  </Step>
+
+  <Step title="Analyze Results">
+    Once complete, view side-by-side comparisons of outputs:
+
+    <Frame caption="Experiment results showing base vs variant outputs">
+      <img src="/images/use-cases/experiments/view.png" alt="Results comparison table with base and experiment outputs"/>
+    </Frame>
+
+    For each input, you can:
+    - Compare outputs side-by-side
+    - Review response quality
+    - Check token usage and cost
+    - Identify where variants perform better
+  </Step>
+</Steps>
+
+## What to Test
+
+### Prompt Variations
+
+Test different approaches to the same task:
+
+<Tabs>
+  <Tab title="Base Prompt">
+    ```
+    You are a customer support assistant. 
+    Answer user questions professionally.
+
+    User: {question}
+    ```
+  </Tab>
+
+  <Tab title="Variant A: More Context">
+    ```
+    You are a customer support assistant for TechCorp, 
+    a B2B SaaS company. Be professional, concise, and 
+    always offer to escalate if needed.
+
+    Company policies:
+    - Refunds within 30 days
+    - 24/7 support for enterprise
+    - Self-service docs at docs.techcorp.com
+
+    User: {question}
+    ```
+  </Tab>
+
+  <Tab title="Variant B: Step-by-Step">
+    ```
+    You are a customer support assistant.
+
+    Follow these steps:
+    1. Understand the user's issue
+    2. Check if it's in our FAQ
+    3. Provide a clear solution
+    4. Ask if they need more help
+
+    User: {question}
+    ```
+  </Tab>
+</Tabs>
+
+### Model Comparison
+
+Compare different models on the same prompt:
+
+- **GPT-4o** vs **GPT-4o-mini** - Does the cheaper model work as well?
+- **GPT-4o** vs **Claude 3.5 Sonnet** - Which provider is better for your use case?
+- **GPT-4o** vs **GPT-4o-2024-08-06** - Test new model versions
+
+### Parameter Tuning
+
+Experiment with model parameters:
+
+```typescript
+// Base configuration
+{
+  temperature: 0.7,
+  max_tokens: 500
+}
+
+// Variant A: More deterministic
+{
+  temperature: 0.3,
+  max_tokens: 500
+}
+
+// Variant B: More creative
+{
+  temperature: 0.9,
+  max_tokens: 500
+}
+```
+
+## Creating Effective Datasets
+
+### Use Representative Data
+
+Your test dataset should cover:
+- Common queries (80% of traffic)
+- Edge cases (10%)
+- Error-prone scenarios (10%)
+
+### Dataset Size Guidelines
+
+- **Quick validation**: 10-20 examples
+- **Thorough testing**: 50-100 examples
+- **Statistical significance**: 200+ examples
+
+<Note>
+Start small! Even 10 examples can reveal obvious issues. Scale up for more confidence.
+</Note>
+
+### Building Datasets Programmatically
+
+Create datasets from production data:
+
+```typescript
+const response = await fetch("https://api.helicone.ai/v1/request/query", {
+  method: "POST",
+  headers: {
+    "Authorization": `Bearer ${HELICONE_API_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    filter: {
+      properties: {
+        "Feature": "customer-support",
+      },
+      response_status: { equals: 200 },
+    },
+    limit: 50,
+  }),
+});
+
+const requests = await response.json();
+
+// Extract prompts for dataset
+const dataset = requests.data.map(req => ({
+  input: req.request.messages,
+  metadata: {
+    original_request_id: req.request_id,
+    user_tier: req.properties.UserTier,
+  }
+}));
+```
+
+## Evaluating Results
+
+### Manual Review
+
+For each output pair, ask:
+- Is the variant more helpful?
+- Is it more accurate?
+- Is the tone appropriate?
+- Is it more concise?
+- Does it follow instructions better?
+
+### Automated Metrics
+
+Track quantitative improvements:
+
+```typescript
+const results = {
+  base: {
+    avg_tokens: 250,
+    avg_latency: 1200,
+    avg_cost: 0.003,
+  },
+  variant: {
+    avg_tokens: 180,  // 28% reduction
+    avg_latency: 900,  // 25% faster
+    avg_cost: 0.002,   // 33% cheaper
+  },
+};
+```
+
+### Using External Evaluators
+
+Integrate with evaluation frameworks:
+
+<Tabs>
+  <Tab title="RAGAS Evaluation">
+    ```python
+    from ragas import evaluate
+    from ragas.metrics import answer_correctness
+
+    # Load experiment results from Helicone
+    results = helicone_client.get_experiment_results(experiment_id)
+
+    # Evaluate with RAGAS
+    scores = evaluate(
+        dataset=results.to_dataset(),
+        metrics=[answer_correctness]
+    )
+
+    # Post scores back to Helicone
+    for request_id, score in scores.items():
+        helicone_client.add_score(request_id, {
+            "ragas_correctness": score
+        })
+    ```
+
+    See the [RAGAS Evaluations tutorial](/guides/tutorials/ragas-evals) for a complete example.
+  </Tab>
+
+  <Tab title="Custom Scoring">
+    ```typescript
+    async function scoreExperimentResults(experimentId: string) {
+      const results = await getExperimentResults(experimentId);
+
+      for (const result of results) {
+        const scores = {
+          length_appropriate: result.output.length < 500 ? 1 : 0,
+          contains_greeting: result.output.includes("Hello") ? 1 : 0,
+          no_errors: !result.output.includes("error") ? 1 : 0,
+        };
+
+        await fetch(`https://api.helicone.ai/v1/request/${result.request_id}/score`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${HELICONE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ scores }),
+        });
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Test One Thing at a Time" icon="bullseye">
+    Change only the prompt OR the model OR the parameters. Testing multiple changes makes it impossible to know what caused improvements.
+  </Accordion>
+
+  <Accordion title="Document Your Hypothesis" icon="clipboard">
+    Before running an experiment, write down:
+    - What you're changing
+    - Why you think it will improve results  
+    - How you'll measure success
+  </Accordion>
+
+  <Accordion title="Include Edge Cases" icon="triangle-exclamation">
+    Test on difficult inputs where your current prompt struggles. These reveal whether your changes fix real problems.
+  </Accordion>
+
+  <Accordion title="Consider Cost vs Quality Trade-offs" icon="scale-balanced">
+    A 5% quality improvement might not justify 200% higher costs. Factor economics into your decisions.
+  </Accordion>
+
+  <Accordion title="Re-run Experiments Periodically" icon="rotate">
+    As models improve, old experiment results become outdated. Re-test important decisions quarterly.
+  </Accordion>
+</AccordionGroup>
+
+## Migration Path
+
+<Note>
+  Since Experiments are being deprecated, we recommend migrating to [Prompt Versions](/prompts/overview) for ongoing testing.
+</Note>
+
+Prompt Versions offer:
+- Version control for all prompt changes
+- A/B testing in production with traffic splitting
+- Real-time comparison of version performance
+- Automatic rollback if quality degrades
+
+## Alternative Approaches
+
+### Production A/B Testing
+
+Test in production with traffic splitting:
+
+```typescript
+const variant = Math.random() < 0.5 ? "A" : "B";
+
+const prompt = variant === "A" 
+  ? basePrompt 
+  : experimentPrompt;
+
+const response = await client.chat.completions.create(
+  {
+    model: "gpt-4o",
+    messages: [{ role: "system", content: prompt }, ...],
+  },
+  {
+    headers: {
+      "Helicone-Property-Variant": variant,
+      "Helicone-Property-Experiment": "prompt-comparison-v3",
+    },
+  }
+);
+```
+
+Then filter by `Variant` property to compare real-world performance.
+
+### Shadow Deployments
+
+Run experiments on every production request:
+
+```typescript
+// Production request
+const productionResponse = await client.chat.completions.create(
+  params,
+  { headers: { "Helicone-Property-Type": "production" } }
+);
+
+// Shadow experiment (async, not returned to user)
+setImmediate(async () => {
+  await client.chat.completions.create(
+    experimentParams,
+    { headers: { "Helicone-Property-Type": "shadow" } }
+  );
+});
+
+return productionResponse;
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="RAGAS Evaluations" icon="chart-line" href="/guides/tutorials/ragas-evals">
+    Automate experiment evaluation with RAGAS metrics
+  </Card>
+  <Card title="Fine-Tuning" icon="sliders" href="/guides/fine-tuning">
+    Move beyond prompt engineering to model fine-tuning
+  </Card>
+  <Card title="Prompt Management" icon="file-code" href="/prompts/overview">
+    Version control and deploy prompts systematically
+  </Card>
+  <Card title="Custom Properties" icon="tags" href="/features/advanced-usage/custom-properties">
+    Track experiment variants in production
+  </Card>
+</CardGroup>

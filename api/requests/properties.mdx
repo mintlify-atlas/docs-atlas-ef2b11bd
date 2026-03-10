@@ -1,0 +1,467 @@
+---
+title: "Add Properties to Request"
+api: "PUT https://api.helicone.ai/v1/request/{requestId}/property"
+description: "Add or update custom properties on a request after it has been created"
+---
+
+Add custom properties to a request after it has been logged. This is useful when you need to enrich request metadata based on business logic, user actions, or post-processing results that aren't available at the time of the original request.
+
+<Note>
+  Properties added via this endpoint are merged with existing properties. To add properties at request time, use the `Helicone-Property-*` headers. See [Custom Properties](/features/advanced-usage/custom-properties) for more details.
+</Note>
+
+## Path Parameters
+
+<ParamField path="requestId" type="string" required>
+  The unique identifier of the request to add properties to. This can be found in the `Helicone-Id` response header when making requests through Helicone.
+  
+  Example: `req_abc123def456`
+</ParamField>
+
+## Request Body
+
+<ParamField body="key" type="string" required>
+  The property key/name. Should be descriptive of the metadata being stored.
+  
+  Examples: `"ConversationOutcome"`, `"UserSatisfaction"`, `"ProcessingStatus"`
+</ParamField>
+
+<ParamField body="value" type="string" required>
+  The property value. Must be a string.
+  
+  Examples: `"resolved"`, `"high"`, `"completed"`
+</ParamField>
+
+## Response
+
+<ResponseField name="data" type="null">
+  Returns null on success.
+</ResponseField>
+
+<ResponseField name="error" type="string | null">
+  Error message if the request failed.
+</ResponseField>
+
+## Examples
+
+### Add Single Property
+
+Add a property to mark conversation outcome:
+
+```bash cURL
+curl --request PUT \
+  --url https://api.helicone.ai/v1/request/req_abc123def456/property \
+  --header 'Authorization: Bearer <HELICONE_API_KEY>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+  "key": "ConversationOutcome",
+  "value": "resolved"
+}'
+```
+
+```typescript TypeScript
+const requestId = 'req_abc123def456';
+
+const response = await fetch(
+  `https://api.helicone.ai/v1/request/${requestId}/property`,
+  {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      key: 'ConversationOutcome',
+      value: 'resolved'
+    })
+  }
+);
+
+const result = await response.json();
+console.log('Property added successfully');
+```
+
+```python Python
+import os
+import requests
+
+request_id = "req_abc123def456"
+
+response = requests.put(
+    f"https://api.helicone.ai/v1/request/{request_id}/property",
+    headers={
+        "Authorization": f"Bearer {os.environ['HELICONE_API_KEY']}",
+        "Content-Type": "application/json"
+    },
+    json={
+        "key": "ConversationOutcome",
+        "value": "resolved"
+    }
+)
+
+result = response.json()
+print("Property added successfully")
+```
+
+### Add Multiple Properties
+
+Add multiple properties to a request (requires multiple API calls):
+
+```typescript TypeScript
+const addMultipleProperties = async (
+  requestId: string,
+  properties: Record<string, string>
+) => {
+  const promises = Object.entries(properties).map(([key, value]) =>
+    fetch(
+      `https://api.helicone.ai/v1/request/${requestId}/property`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ key, value })
+      }
+    )
+  );
+  
+  await Promise.all(promises);
+  console.log('All properties added successfully');
+};
+
+// Usage
+await addMultipleProperties('req_abc123def456', {
+  'ConversationOutcome': 'resolved',
+  'ResolutionTime': '5m',
+  'CustomerSatisfaction': 'high',
+  'AgentId': 'agent_789'
+});
+```
+
+```python Python
+import os
+import requests
+from concurrent.futures import ThreadPoolExecutor
+
+def add_property(request_id: str, key: str, value: str):
+    response = requests.put(
+        f"https://api.helicone.ai/v1/request/{request_id}/property",
+        headers={
+            "Authorization": f"Bearer {os.environ['HELICONE_API_KEY']}",
+            "Content-Type": "application/json"
+        },
+        json={"key": key, "value": value}
+    )
+    return response.json()
+
+def add_multiple_properties(request_id: str, properties: dict):
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [
+            executor.submit(add_property, request_id, key, value)
+            for key, value in properties.items()
+        ]
+        results = [future.result() for future in futures]
+    print("All properties added successfully")
+    return results
+
+# Usage
+add_multiple_properties("req_abc123def456", {
+    "ConversationOutcome": "resolved",
+    "ResolutionTime": "5m",
+    "CustomerSatisfaction": "high",
+    "AgentId": "agent_789"
+})
+```
+
+## Use Cases
+
+### Post-Processing Enrichment
+
+Add properties after processing the LLM response:
+
+```typescript
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'https://gateway.helicone.ai/v1',
+  defaultHeaders: {
+    'Helicone-Auth': `Bearer ${process.env.HELICONE_API_KEY}`
+  }
+});
+
+// Make the request
+const { data, response } = await client.chat.completions
+  .create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: 'Explain quantum computing' }]
+  })
+  .withResponse();
+
+const requestId = response.headers.get('helicone-id');
+const responseText = data.choices[0].message.content;
+
+// Analyze the response and add properties
+const wordCount = responseText.split(' ').length;
+const hasCodeExample = responseText.includes('```');
+const sentiment = analyzesentiment(responseText); // Your sentiment analysis
+
+// Add enrichment properties
+await Promise.all([
+  fetch(`https://api.helicone.ai/v1/request/${requestId}/property`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ key: 'WordCount', value: wordCount.toString() })
+  }),
+  fetch(`https://api.helicone.ai/v1/request/${requestId}/property`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ key: 'HasCodeExample', value: hasCodeExample.toString() })
+  }),
+  fetch(`https://api.helicone.ai/v1/request/${requestId}/property`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ key: 'Sentiment', value: sentiment })
+  })
+]);
+```
+
+### Workflow Status Tracking
+
+Track multi-step workflow progress:
+
+```typescript
+const processWorkflow = async (userQuery: string) => {
+  // Step 1: Initial LLM call
+  const { data: step1Data, response: step1Response } = await client.chat.completions
+    .create({
+      model: 'gpt-4',
+      messages: [{ role: 'user', content: userQuery }]
+    })
+    .withResponse();
+  
+  const requestId = step1Response.headers.get('helicone-id');
+  
+  // Mark as processing
+  await fetch(`https://api.helicone.ai/v1/request/${requestId}/property`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ key: 'WorkflowStatus', value: 'processing' })
+  });
+  
+  // Step 2: Additional processing
+  const processingResult = await processData(step1Data);
+  
+  // Update status
+  await fetch(`https://api.helicone.ai/v1/request/${requestId}/property`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ key: 'WorkflowStatus', value: 'completed' })
+  });
+  
+  // Add final outcome
+  await fetch(`https://api.helicone.ai/v1/request/${requestId}/property`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ key: 'FinalOutcome', value: processingResult.status })
+  });
+};
+```
+
+### Customer Support Tagging
+
+Tag support conversations with resolution details:
+
+```typescript
+const handleSupportConversation = async (ticketId: string, userMessage: string) => {
+  // Make request with initial properties
+  const { data, response } = await client.chat.completions
+    .create(
+      {
+        model: 'gpt-4',
+        messages: [
+          { role: 'system', content: 'You are a helpful support agent.' },
+          { role: 'user', content: userMessage }
+        ]
+      },
+      {
+        headers: {
+          'Helicone-Property-TicketId': ticketId,
+          'Helicone-Property-Channel': 'chat'
+        }
+      }
+    )
+    .withResponse();
+  
+  const requestId = response.headers.get('helicone-id');
+  
+  // User interaction happens...
+  // Later, after ticket is resolved:
+  
+  await Promise.all([
+    fetch(`https://api.helicone.ai/v1/request/${requestId}/property`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ key: 'TicketStatus', value: 'resolved' })
+    }),
+    fetch(`https://api.helicone.ai/v1/request/${requestId}/property`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ key: 'ResolutionTime', value: '15m' })
+    }),
+    fetch(`https://api.helicone.ai/v1/request/${requestId}/property`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ key: 'RequiredEscalation', value: 'false' })
+    })
+  ]);
+};
+```
+
+### A/B Test Results
+
+Add experiment results after evaluation:
+
+```typescript
+const runExperiment = async (variant: 'A' | 'B') => {
+  const { data, response } = await client.chat.completions
+    .create(
+      {
+        model: 'gpt-4',
+        messages: [{ role: 'user', content: 'Explain climate change' }]
+      },
+      {
+        headers: {
+          'Helicone-Property-Variant': variant,
+          'Helicone-Property-Experiment': 'prompt-test-1'
+        }
+      }
+    )
+    .withResponse();
+  
+  const requestId = response.headers.get('helicone-id');
+  const responseText = data.choices[0].message.content;
+  
+  // Evaluate response quality
+  const qualityScore = await evaluateQuality(responseText);
+  const userEngagement = await trackUserEngagement(responseText);
+  
+  // Add evaluation results as properties
+  await Promise.all([
+    fetch(`https://api.helicone.ai/v1/request/${requestId}/property`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ key: 'QualityScore', value: qualityScore.toString() })
+    }),
+    fetch(`https://api.helicone.ai/v1/request/${requestId}/property`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ key: 'UserEngagement', value: userEngagement })
+    }),
+    fetch(`https://api.helicone.ai/v1/request/${requestId}/property`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ key: 'EvaluationComplete', value: 'true' })
+    })
+  ]);
+};
+```
+
+## Querying by Properties
+
+Once properties are added, you can query requests by those properties:
+
+```typescript
+// Query all resolved support tickets
+const response = await fetch(
+  'https://api.helicone.ai/v1/request/query',
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.HELICONE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      filter: {
+        request_response_rmt: {
+          properties: {
+            'TicketStatus': {
+              equals: 'resolved'
+            }
+          }
+        }
+      },
+      limit: 100
+    })
+  }
+);
+```
+
+## Best Practices
+
+- **Consistent Naming**: Use consistent property key names across your application for easier filtering and analysis
+- **String Values**: All property values must be strings. Convert numbers and booleans to strings when needed
+- **Meaningful Keys**: Use descriptive property keys that clearly indicate the metadata being stored
+- **Combine with Headers**: Use `Helicone-Property-*` headers for properties known at request time, and this API for post-request enrichment
+- **Batch Operations**: When adding multiple properties, use `Promise.all()` to make parallel requests for better performance
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Get Request by ID" icon="magnifying-glass" href="/api/requests/get">
+    Retrieve request with all properties
+  </Card>
+  
+  <Card title="Query Requests" icon="filter" href="/api/requests/query">
+    Query requests filtered by properties
+  </Card>
+  
+  <Card title="Add Feedback" icon="thumbs-up" href="/api/requests/feedback">
+    Add user feedback to requests
+  </Card>
+  
+  <Card title="Add Scores" icon="star" href="/api/requests/scores">
+    Add evaluation scores to requests
+  </Card>
+</CardGroup>
+
+## See Also
+
+- [Custom Properties Guide](/features/advanced-usage/custom-properties) - Complete guide to using custom properties
+- [Custom Properties Header Reference](/helicone-headers/header-directory#helicone-property-name) - Header-based property assignment

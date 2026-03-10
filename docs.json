@@ -1,122 +1,216 @@
 {
   "$schema": "https://mintlify.com/docs.json",
+  "name": "Helicone",
   "theme": "mint",
-  "name": "Mint Starter Kit",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#3188ad",
+    "light": "#e4f0f7",
+    "dark": "#7e8385"
   },
-  "favicon": "/favicon.svg",
+
+  "logo": {
+    "light": "https://media.brand.dev/c16509ea-f1b2-4cb7-aca1-510898fffc48.png",
+    "dark": "https://media.brand.dev/c16509ea-f1b2-4cb7-aca1-510898fffc48.png"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Community",
+        "href": "https://discord.com/invite/zsSTcH2qhG"
+      }
+    ],
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/helicone/helicone"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/helicone/helicone",
+      "twitter": "https://twitter.com/helicone_ai",
+      "discord": "https://discord.com/invite/zsSTcH2qhG",
+      "linkedin": "https://www.linkedin.com/company/helicone"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "quick-start",
+              "platform-overview"
             ]
           },
           {
-            "group": "Customization",
+            "group": "AI Gateway",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "gateway/overview",
+              "gateway/getting-started",
+              "gateway/routing",
+              "gateway/fallbacks",
+              "gateway/prompt-integration",
+              "gateway/integrations"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Observability",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "observability/overview",
+              "observability/requests",
+              "observability/sessions",
+              "observability/traces",
+              "observability/metrics",
+              "observability/custom-properties"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Prompt Management",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "prompts/overview",
+              "prompts/versioning",
+              "prompts/deployment",
+              "prompts/experiments"
+            ]
+          },
+          {
+            "group": "Evaluation & Testing",
+            "pages": [
+              "evaluation/overview",
+              "evaluation/datasets",
+              "evaluation/scores",
+              "evaluation/feedback"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/caching",
+              "features/rate-limiting",
+              "features/webhooks",
+              "features/alerts",
+              "features/security"
+            ]
+          },
+          {
+            "group": "Self-Hosting",
+            "pages": [
+              "self-hosting/overview",
+              "self-hosting/docker",
+              "self-hosting/kubernetes",
+              "self-hosting/architecture"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/overview",
+              "integrations/openai",
+              "integrations/anthropic",
+              "integrations/langchain",
+              "integrations/vercel-ai-sdk",
+              "integrations/async-logging"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Overview",
             "pages": [
-              "api-reference/introduction"
+              "api/introduction",
+              "api/authentication"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "AI Gateway",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/gateway/chat-completions",
+              "api/gateway/models"
+            ]
+          },
+          {
+            "group": "Requests",
+            "pages": [
+              "api/requests/query",
+              "api/requests/get",
+              "api/requests/feedback",
+              "api/requests/properties",
+              "api/requests/scores"
+            ]
+          },
+          {
+            "group": "Sessions",
+            "pages": [
+              "api/sessions/query",
+              "api/sessions/metrics",
+              "api/sessions/feedback"
+            ]
+          },
+          {
+            "group": "Prompts",
+            "pages": [
+              "api/prompts/create",
+              "api/prompts/get",
+              "api/prompts/update",
+              "api/prompts/query",
+              "api/prompts/versions"
+            ]
+          },
+          {
+            "group": "Evaluations",
+            "pages": [
+              "api/evals/query",
+              "api/evals/create",
+              "api/evals/scores"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "api/webhooks/list",
+              "api/webhooks/create",
+              "api/webhooks/delete"
+            ]
+          },
+          {
+            "group": "Users",
+            "pages": [
+              "api/users/query",
+              "api/users/metrics"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Use Cases",
+            "pages": [
+              "guides/overview",
+              "guides/agent-tracing",
+              "guides/cost-tracking",
+              "guides/debugging",
+              "guides/experiments",
+              "guides/fine-tuning"
+            ]
+          },
+          {
+            "group": "Tutorials",
+            "pages": [
+              "guides/tutorials/vercel-ai-gateway",
+              "guides/tutorials/ragas-evals",
+              "guides/tutorials/structured-outputs"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

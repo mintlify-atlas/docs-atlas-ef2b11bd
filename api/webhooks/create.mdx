@@ -1,0 +1,125 @@
+---
+title: "Create Webhook"
+sidebarTitle: "Create Webhook"
+description: "Create a new webhook to receive real-time notifications for your requests"
+openapi: post /v1/webhooks
+---
+
+This endpoint creates a new webhook endpoint that will receive real-time notifications when requests are logged to Helicone. Configure sampling rates and property filters to control which events trigger the webhook.
+
+## Use Cases
+
+- Set up real-time monitoring for LLM requests
+- Integrate Helicone data with external systems
+- Build custom alerting and notification systems
+- Stream request data to analytics platforms
+
+## Request Body
+
+<ParamField body="destination" type="string" required>
+  The URL endpoint where webhook events will be sent. Must be a valid HTTPS URL.
+</ParamField>
+
+<ParamField body="config" type="object" required>
+  Configuration object for the webhook
+  
+  <ParamField body="config.sampleRate" type="number">
+    Percentage of requests to send to the webhook (0-100). Default: 100
+  </ParamField>
+  
+  <ParamField body="config.propertyFilters" type="array">
+    Array of property filters to match specific requests
+    
+    <ParamField body="config.propertyFilters[].key" type="string" required>
+      Property key to filter on (e.g., "model", "user_id")
+    </ParamField>
+    
+    <ParamField body="config.propertyFilters[].value" type="string" required>
+      Property value to match
+    </ParamField>
+  </ParamField>
+</ParamField>
+
+<ParamField body="includeData" type="boolean">
+  Whether to include full request/response data in webhook payload. Default: true
+</ParamField>
+
+## Response
+
+Returns a Result object with the created webhook data.
+
+<ResponseField name="data" type="object">
+  Created webhook information (structure depends on database response)
+</ResponseField>
+
+<ResponseField name="error" type="string | null">
+  Error message if the request failed, null on success
+</ResponseField>
+
+## Example Request
+
+```bash
+curl --request POST \
+  --url https://api.helicone.ai/v1/webhooks \
+  --header 'Authorization: Bearer <YOUR_API_KEY>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "destination": "https://example.com/webhook",
+    "config": {
+      "sampleRate": 100,
+      "propertyFilters": [
+        {
+          "key": "model",
+          "value": "gpt-4"
+        }
+      ]
+    },
+    "includeData": true
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "data": {},
+  "error": null
+}
+```
+
+## Webhook Payload
+
+When your webhook is triggered, it will receive a POST request with the following structure:
+
+```json
+{
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "model": "gpt-4",
+  "created_at": "2024-01-15T10:30:00Z",
+  "properties": {
+    "user_id": "user_123"
+  },
+  "request": { /* full request data if includeData: true */ },
+  "response": { /* full response data if includeData: true */ }
+}
+```
+
+## Webhook Verification
+
+All webhook requests include an HMAC signature in the `X-Helicone-Signature` header. Use the `hmac_key` from the webhook list endpoint to verify the signature and ensure the request is authentic.
+
+## Error Responses
+
+```json
+{
+  "data": null,
+  "error": "Sample rate must be between 0 and 100"
+}
+```
+
+```json
+{
+  "data": null,
+  "error": "Property filters must be an array of objects with key and value properties"
+}
+```

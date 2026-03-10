@@ -1,0 +1,580 @@
+---
+title: 'Async Logging'
+description: 'Zero-latency logging with @helicone/async and OpenLLMetry'
+icon: 'bolt'
+---
+
+Helicone's async logging provides zero-latency observability by logging requests asynchronously without proxying traffic through our servers.
+
+## Why Async Logging?
+
+<CardGroup cols={2}>
+  <Card title="Zero Latency" icon="gauge-high">
+    No proxy overhead - requests go directly to the provider.
+  </Card>
+  <Card title="Automatic Instrumentation" icon="wand-magic-sparkles">
+    Uses OpenLLMetry to automatically capture all LLM calls.
+  </Card>
+  <Card title="Multi-Provider Support" icon="layer-group">
+    Works with OpenAI, Anthropic, Cohere, Bedrock, Google AI, and more.
+  </Card>
+  <Card title="Framework Support" icon="diagram-project">
+    Supports LangChain, LlamaIndex, and other frameworks.
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+<Steps>
+  <Step title="Install the package">
+    ```bash
+    npm install @helicone/async
+    ```
+  </Step>
+  
+  <Step title="Initialize the logger">
+    ```typescript
+    import { HeliconeAsyncLogger } from "@helicone/async";
+    import OpenAI from "openai";
+
+    const logger = new HeliconeAsyncLogger({
+      apiKey: process.env.HELICONE_API_KEY!,
+      providers: {
+        openAI: OpenAI,
+      },
+    });
+    logger.init();
+    ```
+  </Step>
+  
+  <Step title="Use your SDK normally">
+    ```typescript
+    const client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: "Hello!" }],
+    });
+
+    // Requests are logged asynchronously to Helicone
+    ```
+  </Step>
+  
+  <Step title="View your logs">
+    All requests appear in your [Helicone dashboard](https://us.helicone.ai/dashboard) with zero latency impact.
+  </Step>
+</Steps>
+
+## Supported Providers
+
+### OpenAI
+
+```typescript
+import { HeliconeAsyncLogger } from "@helicone/async";
+import OpenAI from "openai";
+
+const logger = new HeliconeAsyncLogger({
+  apiKey: process.env.HELICONE_API_KEY!,
+  providers: {
+    openAI: OpenAI,
+  },
+});
+logger.init();
+
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const response = await client.chat.completions.create({
+  model: "gpt-4o-mini",
+  messages: [{ role: "user", content: "Hello!" }],
+});
+```
+
+### Anthropic
+
+```typescript
+import { HeliconeAsyncLogger } from "@helicone/async";
+import Anthropic from "@anthropic-ai/sdk";
+
+const logger = new HeliconeAsyncLogger({
+  apiKey: process.env.HELICONE_API_KEY!,
+  providers: {
+    anthropic: Anthropic,
+  },
+});
+logger.init();
+
+const client = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+const response = await client.messages.create({
+  model: "claude-3-5-sonnet-20240620",
+  max_tokens: 1024,
+  messages: [{ role: "user", content: "Hello!" }],
+});
+```
+
+### Multiple Providers
+
+```typescript
+import { HeliconeAsyncLogger } from "@helicone/async";
+import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
+import Cohere from "cohere-ai";
+
+const logger = new HeliconeAsyncLogger({
+  apiKey: process.env.HELICONE_API_KEY!,
+  providers: {
+    openAI: OpenAI,
+    anthropic: Anthropic,
+    cohere: Cohere,
+  },
+});
+logger.init();
+
+// All providers are now instrumented
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const cohere = new Cohere({ apiKey: process.env.COHERE_API_KEY });
+```
+
+### AWS Bedrock
+
+```typescript
+import { HeliconeAsyncLogger } from "@helicone/async";
+import * as bedrock from "@aws-sdk/client-bedrock-runtime";
+
+const logger = new HeliconeAsyncLogger({
+  apiKey: process.env.HELICONE_API_KEY!,
+  providers: {
+    bedrock: bedrock,
+  },
+});
+logger.init();
+
+const client = new bedrock.BedrockRuntimeClient({
+  region: "us-east-1",
+});
+```
+
+### Google AI Platform
+
+```typescript
+import { HeliconeAsyncLogger } from "@helicone/async";
+import * as google_aiplatform from "@google-cloud/aiplatform";
+
+const logger = new HeliconeAsyncLogger({
+  apiKey: process.env.HELICONE_API_KEY!,
+  providers: {
+    google_aiplatform: google_aiplatform,
+  },
+});
+logger.init();
+```
+
+### Together AI
+
+```typescript
+import { HeliconeAsyncLogger } from "@helicone/async";
+import Together from "together-ai";
+
+const logger = new HeliconeAsyncLogger({
+  apiKey: process.env.HELICONE_API_KEY!,
+  providers: {
+    together: Together,
+  },
+});
+logger.init();
+
+const client = new Together({
+  apiKey: process.env.TOGETHER_API_KEY,
+});
+```
+
+## LangChain Integration
+
+Async logging works automatically with LangChain:
+
+```typescript
+import { HeliconeAsyncLogger } from "@helicone/async";
+import OpenAI from "openai";
+import { ChatOpenAI } from "@langchain/openai";
+
+const logger = new HeliconeAsyncLogger({
+  apiKey: process.env.HELICONE_API_KEY!,
+  providers: {
+    openAI: OpenAI,
+    langchain: {
+      chainsModule: await import("langchain/chains"),
+      agentsModule: await import("langchain/agents"),
+      toolsModule: await import("langchain/tools"),
+    },
+  },
+});
+logger.init();
+
+// Use LangChain normally - all requests are logged
+const model = new ChatOpenAI({
+  modelName: "gpt-4o-mini",
+});
+
+const response = await model.invoke("Hello!");
+```
+
+## Custom Properties
+
+Add custom properties using the `withProperties` method:
+
+```typescript
+import { HeliconeAsyncLogger } from "@helicone/async";
+import OpenAI from "openai";
+
+const logger = new HeliconeAsyncLogger({
+  apiKey: process.env.HELICONE_API_KEY!,
+  providers: { openAI: OpenAI },
+});
+logger.init();
+
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// Add custom properties to a specific request
+await logger.withProperties(
+  {
+    "Helicone-User-Id": "user-123",
+    "Helicone-Session-Id": "session-456",
+    "Helicone-Property-Environment": "production",
+    "Helicone-Property-Feature": "chat",
+  },
+  async () => {
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: "Hello!" }],
+    });
+    return response;
+  }
+);
+```
+
+## Custom Headers
+
+Add custom headers for all requests:
+
+```typescript
+const logger = new HeliconeAsyncLogger({
+  apiKey: process.env.HELICONE_API_KEY!,
+  providers: { openAI: OpenAI },
+  headers: {
+    "Helicone-Property-Environment": "production",
+    "Helicone-Property-App": "chatbot",
+  },
+});
+logger.init();
+
+// All requests will include these headers
+```
+
+## Custom Base URL
+
+Use a custom Helicone endpoint:
+
+```typescript
+const logger = new HeliconeAsyncLogger({
+  apiKey: process.env.HELICONE_API_KEY!,
+  baseUrl: "https://eu.api.helicone.ai/v1/trace/log", // EU region
+  providers: { openAI: OpenAI },
+});
+logger.init();
+```
+
+The base URL is automatically determined by your API key prefix:
+- `sk-helicone-eu-*` → `https://eu.api.helicone.ai/v1/trace/log`
+- Other keys → `https://api.helicone.ai/v1/trace/log`
+
+## How It Works
+
+<Steps>
+  <Step title="Automatic instrumentation">
+    When you call `logger.init()`, Helicone uses OpenLLMetry to automatically instrument your LLM SDKs.
+  </Step>
+  
+  <Step title="Trace capture">
+    OpenLLMetry captures traces of all LLM calls, including:
+    - Request parameters
+    - Response data
+    - Token usage
+    - Latency
+    - Errors
+  </Step>
+  
+  <Step title="Async export">
+    Traces are sent asynchronously to Helicone's trace endpoint using OpenTelemetry's OTLP format.
+  </Step>
+  
+  <Step title="Zero latency">
+    Since logging happens asynchronously, there's no impact on your application's latency.
+  </Step>
+</Steps>
+
+## Configuration Options
+
+```typescript
+interface HeliconeAsyncLoggerOptions {
+  apiKey: string; // Your Helicone API key (required)
+  baseUrl?: string; // Custom Helicone endpoint (optional)
+  providers: {
+    openAI?: typeof OpenAI;
+    anthropic?: typeof Anthropic;
+    cohere?: typeof Cohere;
+    bedrock?: typeof Bedrock;
+    google_aiplatform?: typeof GoogleAIPlatform;
+    together?: typeof Together;
+    langchain?: {
+      chainsModule?: typeof ChainsModule;
+      agentsModule?: typeof AgentsModule;
+      toolsModule?: typeof ToolsModule;
+    };
+  };
+  headers?: Record<string, string>; // Custom headers for all requests
+}
+```
+
+## Streaming Support
+
+Async logging works with streaming:
+
+```typescript
+import { HeliconeAsyncLogger } from "@helicone/async";
+import OpenAI from "openai";
+
+const logger = new HeliconeAsyncLogger({
+  apiKey: process.env.HELICONE_API_KEY!,
+  providers: { openAI: OpenAI },
+});
+logger.init();
+
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const stream = await client.chat.completions.create({
+  model: "gpt-4o-mini",
+  messages: [{ role: "user", content: "Write a poem" }],
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0]?.delta?.content || "");
+}
+
+// Complete stream is logged to Helicone
+```
+
+## Error Handling
+
+Errors are automatically logged:
+
+```typescript
+try {
+  const response = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Hello!" }],
+  });
+} catch (error) {
+  // Error is automatically logged to Helicone
+  console.error("Request failed:", error);
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Initialize once at startup">
+    Initialize the logger once when your application starts:
+    
+    ```typescript
+    // logger.ts
+    import { HeliconeAsyncLogger } from "@helicone/async";
+    import OpenAI from "openai";
+
+    const logger = new HeliconeAsyncLogger({
+      apiKey: process.env.HELICONE_API_KEY!,
+      providers: { openAI: OpenAI },
+    });
+    logger.init();
+
+    export { logger };
+    ```
+    
+    Then import and use in your application:
+    
+    ```typescript
+    import "./logger"; // Initialize logger
+    import OpenAI from "openai";
+
+    const client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+    ```
+  </Accordion>
+  
+  <Accordion title="Use withProperties for request context">
+    Add context to specific requests:
+    
+    ```typescript
+    await logger.withProperties(
+      {
+        "Helicone-User-Id": userId,
+        "Helicone-Session-Id": sessionId,
+      },
+      async () => {
+        return await client.chat.completions.create({...});
+      }
+    );
+    ```
+  </Accordion>
+  
+  <Accordion title="Set common headers globally">
+    Use the `headers` option for properties that apply to all requests:
+    
+    ```typescript
+    const logger = new HeliconeAsyncLogger({
+      apiKey: process.env.HELICONE_API_KEY!,
+      providers: { openAI: OpenAI },
+      headers: {
+        "Helicone-Property-Environment": process.env.NODE_ENV,
+        "Helicone-Property-Version": process.env.APP_VERSION,
+      },
+    });
+    ```
+  </Accordion>
+  
+  <Accordion title="Combine with proxy for testing">
+    Use async logging in production and proxy in development:
+    
+    ```typescript
+    if (process.env.NODE_ENV === "production") {
+      // Async logging for zero latency
+      const logger = new HeliconeAsyncLogger({
+        apiKey: process.env.HELICONE_API_KEY!,
+        providers: { openAI: OpenAI },
+      });
+      logger.init();
+      
+      const client = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      });
+    } else {
+      // Proxy for easier debugging
+      const client = new OpenAI({
+        baseURL: "https://oai.helicone.ai/v1",
+        apiKey: process.env.OPENAI_API_KEY,
+        defaultHeaders: {
+          "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+        },
+      });
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Comparison: Async vs Proxy
+
+| Feature | Async Logging | Proxy Integration |
+|---------|--------------|-------------------|
+| Latency Impact | Zero (async) | ~20-50ms |
+| Setup Complexity | Medium | Low |
+| Custom Headers | Via `withProperties()` | Via headers |
+| Streaming | ✅ Full support | ✅ Full support |
+| Error Tracking | ✅ Automatic | ✅ Automatic |
+| Multi-Provider | ✅ All providers | ✅ All providers |
+| Request Caching | ❌ Not supported | ✅ Supported |
+| Rate Limiting | ❌ Not supported | ✅ Supported |
+| Best For | Production apps | Development & features |
+
+<Tip>
+  Use **async logging** for production to eliminate latency. Use **proxy integration** when you need features like caching and rate limiting.
+</Tip>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Requests not appearing in dashboard">
+    1. Verify your Helicone API key is correct
+    2. Check that `logger.init()` is called before making requests
+    3. Ensure the provider is passed to the logger configuration
+    4. Check for any network errors in your logs
+  </Accordion>
+  
+  <Accordion title="Missing custom properties">
+    - Use `logger.withProperties()` to add properties per request
+    - Use the `headers` option for global properties
+    - Property names must start with `Helicone-Property-`
+  </Accordion>
+  
+  <Accordion title="LangChain not being tracked">
+    - Import and pass the LangChain modules to the logger:
+    ```typescript
+    providers: {
+      langchain: {
+        chainsModule: await import("langchain/chains"),
+        agentsModule: await import("langchain/agents"),
+        toolsModule: await import("langchain/tools"),
+      },
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Provider not supported">
+    Currently supported providers:
+    - OpenAI
+    - Anthropic
+    - Cohere
+    - AWS Bedrock
+    - Google AI Platform
+    - Together AI
+    - LangChain
+    
+    For other providers, use [proxy integration](/integrations/overview).
+  </Accordion>
+</AccordionGroup>
+
+## TypeScript Support
+
+The `@helicone/async` package includes full TypeScript types:
+
+```typescript
+import { HeliconeAsyncLogger } from "@helicone/async";
+import type { IHeliconeAsyncLoggerOptions } from "@helicone/async";
+
+const options: IHeliconeAsyncLoggerOptions = {
+  apiKey: process.env.HELICONE_API_KEY!,
+  providers: {
+    openAI: OpenAI,
+  },
+};
+
+const logger = new HeliconeAsyncLogger(options);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="OpenAI Integration" icon="brain" href="/integrations/openai">
+    OpenAI-specific integration guide
+  </Card>
+  <Card title="Anthropic Integration" icon="message" href="/integrations/anthropic">
+    Anthropic-specific integration guide
+  </Card>
+  <Card title="LangChain Integration" icon="link" href="/integrations/langchain">
+    LangChain integration patterns
+  </Card>
+  <Card title="Proxy Integration" icon="shuffle" href="/integrations/overview">
+    Compare with proxy integration
+  </Card>
+</CardGroup>

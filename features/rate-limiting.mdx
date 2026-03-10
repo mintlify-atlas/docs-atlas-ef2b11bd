@@ -1,0 +1,359 @@
+---
+title: 'Rate Limiting'
+description: 'Control API usage per user, team, or custom segment with flexible rate limits'
+---
+
+## Overview
+
+Helicone's rate limiting feature allows you to control API usage by enforcing request or cost-based quotas. Set limits per user, organization, custom property, or globally to prevent overuse and manage budgets.
+
+<Info>
+Rate limiting is ideal for:
+- Preventing individual users from exceeding quotas
+- Managing costs across teams or departments
+- Enforcing fair usage in multi-tenant applications
+- Protecting against runaway API consumption
+</Info>
+
+## Key Benefits
+
+<CardGroup cols={2}>
+  <Card title="Flexible Policies" icon="sliders">
+    Rate limit by requests, cost (in cents), time windows, and custom segments
+  </Card>
+  <Card title="Fine-Grained Control" icon="filter">
+    Apply limits per user, property, or globally across your entire organization
+  </Card>
+  <Card title="Cost Management" icon="dollar-sign">
+    Set budget limits in cents to prevent unexpected spending
+  </Card>
+  <Card title="Instant Feedback" icon="bolt">
+    Users receive immediate 429 responses when limits are exceeded with retry information
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+Apply rate limiting by adding the `Helicone-RateLimit-Policy` header:
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { OpenAI } from "openai";
+
+    const client = new OpenAI({
+      baseURL: "https://ai-gateway.helicone.ai",
+      apiKey: process.env.HELICONE_API_KEY,
+      defaultHeaders: {
+        // 100 requests per minute
+        "Helicone-RateLimit-Policy": "100;w=60",
+      },
+    });
+
+    try {
+      const response = await client.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: "Hello!" }],
+      });
+    } catch (error) {
+      if (error.status === 429) {
+        console.log("Rate limit exceeded!");
+        console.log("Retry after:", error.headers.get("Retry-After"));
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    from openai import OpenAI
+
+    client = OpenAI(
+        base_url="https://ai-gateway.helicone.ai",
+        api_key=os.getenv("HELICONE_API_KEY"),
+        default_headers={
+            # 100 requests per minute
+            "Helicone-RateLimit-Policy": "100;w=60",
+        },
+    )
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": "Hello!"}]
+        )
+    except Exception as error:
+        if hasattr(error, 'status_code') and error.status_code == 429:
+            print("Rate limit exceeded!")
+            print(f"Retry after: {error.headers.get('Retry-After')}")
+    ```
+  </Tab>
+  
+  <Tab title="cURL">
+    ```bash
+    curl https://ai-gateway.helicone.ai/chat/completions \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $HELICONE_API_KEY" \
+      -H "Helicone-RateLimit-Policy: 100;w=60" \
+      -d '{
+        "model": "gpt-4o-mini",
+        "messages": [{"role": "user", "content": "Hello!"}]
+      }'
+    ```
+  </Tab>
+</Tabs>
+
+## Policy Format
+
+The `Helicone-RateLimit-Policy` header uses this format:
+
+```
+[quota];w=[window_seconds];u=[unit];s=[segment]
+```
+
+### Required Parameters
+
+- **quota**: Maximum number of requests or cents allowed
+- **w**: Time window in seconds (minimum: 60, maximum: 31536000)
+
+### Optional Parameters
+
+- **u**: Unit of measurement (`request` or `cents`, default: `request`)
+- **s**: Segmentation type (`user`, custom property name, or omit for global)
+
+## Policy Examples
+
+### Request-Based Limits
+
+```typescript
+// 1000 requests per hour (global)
+"Helicone-RateLimit-Policy": "1000;w=3600"
+
+// 100 requests per minute per user
+"Helicone-RateLimit-Policy": "100;w=60;s=user"
+
+// 5000 requests per day per organization
+"Helicone-RateLimit-Policy": "5000;w=86400;s=organization"
+```
+
+### Cost-Based Limits
+
+```typescript
+// $50 per day (5000 cents, global)
+"Helicone-RateLimit-Policy": "5000;w=86400;u=cents"
+
+// $10 per hour per user (1000 cents)
+"Helicone-RateLimit-Policy": "1000;w=3600;u=cents;s=user"
+
+// $0.50 per minute for testing (0.5 cents)
+"Helicone-RateLimit-Policy": "0.5;w=60;u=cents"
+```
+
+### Custom Property Segments
+
+```typescript
+// 200 requests per hour per team
+"Helicone-RateLimit-Policy": "200;w=3600;s=team"
+"Helicone-Property-Team": "engineering"
+
+// 1000 requests per day per customer
+"Helicone-RateLimit-Policy": "1000;w=86400;s=customer-id"
+"Helicone-Property-Customer-Id": "acme-corp"
+```
+
+## Segmentation Types
+
+<Tabs>
+  <Tab title="Global (Default)">
+    Rate limit applies across all requests:
+
+    ```typescript
+    const client = new OpenAI({
+      baseURL: "https://ai-gateway.helicone.ai",
+      apiKey: process.env.HELICONE_API_KEY,
+      defaultHeaders: {
+        "Helicone-RateLimit-Policy": "10000;w=3600",
+      },
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Per User">
+    Rate limit applies separately for each user:
+
+    ```typescript
+    const client = new OpenAI({
+      baseURL: "https://ai-gateway.helicone.ai",
+      apiKey: process.env.HELICONE_API_KEY,
+      defaultHeaders: {
+        "Helicone-RateLimit-Policy": "100;w=60;s=user",
+        "Helicone-User-Id": userId, // Each user gets their own limit
+      },
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Custom Property">
+    Rate limit by any custom property:
+
+    ```typescript
+    const client = new OpenAI({
+      baseURL: "https://ai-gateway.helicone.ai",
+      apiKey: process.env.HELICONE_API_KEY,
+      defaultHeaders: {
+        "Helicone-RateLimit-Policy": "500;w=3600;s=department",
+        "Helicone-Property-Department": "sales",
+      },
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Response Headers
+
+When rate limiting is active, Helicone adds headers to every response:
+
+| Header | Description | Example |
+|--------|-------------|----------|
+| `X-RateLimit-Limit` | Maximum quota for the time window | `100` |
+| `X-RateLimit-Remaining` | Remaining quota in current window | `87` |
+| `X-RateLimit-Reset` | Unix timestamp when window resets | `1678901234` |
+| `X-RateLimit-Policy` | Active policy string | `100;w=60;s=user` |
+
+### Rate Limit Exceeded (429 Response)
+
+When limits are exceeded:
+
+```json
+{
+  "status": 429,
+  "headers": {
+    "X-RateLimit-Limit": "100",
+    "X-RateLimit-Remaining": "0",
+    "X-RateLimit-Reset": "1678901294",
+    "Retry-After": "60"
+  },
+  "body": {
+    "error": {
+      "message": "Rate limit exceeded",
+      "type": "rate_limit_exceeded"
+    }
+  }
+}
+```
+
+## Common Time Windows
+
+| Period | Seconds | Example Policy |
+|--------|---------|----------------|
+| 1 minute | 60 | `100;w=60` |
+| 5 minutes | 300 | `500;w=300` |
+| 1 hour | 3600 | `1000;w=3600` |
+| 1 day | 86400 | `10000;w=86400` |
+| 1 week | 604800 | `50000;w=604800` |
+| 1 month (30 days) | 2592000 | `200000;w=2592000` |
+
+## Advanced Use Cases
+
+<AccordionGroup>
+  <Accordion title="Multi-tier rate limits">
+    Implement different limits for different user tiers:
+
+    ```typescript
+    const getRateLimitPolicy = (userTier: string) => {
+      const policies = {
+        free: "100;w=3600;s=user",
+        pro: "1000;w=3600;s=user",
+        enterprise: "10000;w=3600;s=user",
+      };
+      return policies[userTier] || policies.free;
+    };
+
+    const client = new OpenAI({
+      baseURL: "https://ai-gateway.helicone.ai",
+      apiKey: process.env.HELICONE_API_KEY,
+      defaultHeaders: {
+        "Helicone-RateLimit-Policy": getRateLimitPolicy(user.tier),
+        "Helicone-User-Id": user.id,
+      },
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Departmental budget controls">
+    Set cost limits per department:
+
+    ```typescript
+    const client = new OpenAI({
+      baseURL: "https://ai-gateway.helicone.ai",
+      apiKey: process.env.HELICONE_API_KEY,
+      defaultHeaders: {
+        // $100 per day per department
+        "Helicone-RateLimit-Policy": "10000;w=86400;u=cents;s=department",
+        "Helicone-Property-Department": department,
+      },
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Graceful degradation">
+    Handle rate limits with fallback logic:
+
+    ```typescript
+    async function makeRequest(prompt: string, retries = 3) {
+      try {
+        return await client.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [{ role: "user", content: prompt }],
+        });
+      } catch (error) {
+        if (error.status === 429 && retries > 0) {
+          const retryAfter = parseInt(error.headers.get("Retry-After") || "60");
+          await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+          return makeRequest(prompt, retries - 1);
+        }
+        throw error;
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Testing with small budgets">
+    Use decimal values for testing cost limits:
+
+    ```typescript
+    // $0.01 per minute for integration tests
+    "Helicone-RateLimit-Policy": "1;w=60;u=cents"
+
+    // $0.005 per minute (half a cent)
+    "Helicone-RateLimit-Policy": "0.5;w=60;u=cents"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+1. **Start conservative**: Begin with lower limits and increase based on usage patterns
+2. **Monitor metrics**: Track rate limit hits in your Helicone dashboard
+3. **Implement retry logic**: Handle 429 responses gracefully with exponential backoff
+4. **Use appropriate segments**: Choose user, property, or global based on your use case
+5. **Set realistic windows**: Align time windows with your application's usage patterns
+6. **Combine with caching**: Use caching to reduce requests and stay under limits
+
+## Limitations
+
+- Minimum time window: 60 seconds
+- Maximum time window: 31,536,000 seconds (1 year)
+- Policy validation happens on every request
+- Cost-based limits use Helicone's cost calculations
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card title="Caching" icon="database" href="/features/caching">
+    Reduce requests with intelligent caching
+  </Card>
+  <Card title="Webhooks" icon="webhook" href="/features/webhooks">
+    Get notified when limits are exceeded
+  </Card>
+</CardGroup>

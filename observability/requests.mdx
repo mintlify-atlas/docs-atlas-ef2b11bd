@@ -1,0 +1,519 @@
+---
+title: "Requests"
+sidebarTitle: "Requests"
+description: "View, search, and analyze every LLM request with complete request/response bodies, performance metrics, and custom metadata"
+"twitter:title": "Requests - Helicone OSS LLM Observability"
+---
+
+import QuestionsSection from "/snippets/questions-section.mdx";
+
+The Requests page is your central hub for monitoring and debugging LLM requests. Every API call flowing through Helicone is captured with complete context, allowing you to trace issues, analyze performance, and understand how your AI application behaves in production.
+
+## What's Captured
+
+For every LLM request, Helicone records:
+
+<CardGroup cols={2}>
+<Card title="Request Details" icon="arrow-right">
+- Full request body (messages, parameters)
+- Model and provider information
+- Custom properties and metadata
+- User ID and session information
+</Card>
+
+<Card title="Response Details" icon="arrow-left">
+- Complete response body
+- Generated text and function calls
+- Finish reason and stop sequences
+- Token counts and cost
+</Card>
+
+<Card title="Performance Metrics" icon="gauge">
+- Total latency (start to finish)
+- Time to first token (TTFT)
+- Tokens per second
+- Request and response timestamps
+</Card>
+
+<Card title="Metadata" icon="tag">
+- Request ID (for reference)
+- HTTP status codes
+- Error messages (if any)
+- Cache hit/miss status
+</Card>
+</CardGroup>
+
+## Accessing Requests
+
+### Dashboard View
+
+Visit [helicone.ai/requests](https://helicone.ai/requests) to see all your requests in a table view:
+
+- **Real-time updates**: New requests appear automatically
+- **Sortable columns**: Click column headers to sort by any field
+- **Quick filters**: Filter by model, status, user, or date range
+- **Request drawer**: Click any row to see full request details
+
+### Request Details Drawer
+
+Click on any request to open a detailed view showing:
+
+<Tabs>
+<Tab title="Messages">
+View the conversation in a chat-like format:
+- System prompts and instructions
+- User messages with role indicators
+- Assistant responses with streaming indicators
+- Function/tool calls and responses
+</Tab>
+
+<Tab title="Request Body">
+See the complete JSON request sent to the LLM provider:
+```json
+{
+  "model": "gpt-4o-mini",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful assistant."
+    },
+    {
+      "role": "user",
+      "content": "What is the capital of France?"
+    }
+  ],
+  "temperature": 0.7,
+  "max_tokens": 150
+}
+```
+</Tab>
+
+<Tab title="Response Body">
+See the complete JSON response from the provider:
+```json
+{
+  "id": "chatcmpl-123",
+  "object": "chat.completion",
+  "created": 1677652288,
+  "model": "gpt-4o-mini",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "The capital of France is Paris."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 20,
+    "completion_tokens": 8,
+    "total_tokens": 28
+  }
+}
+```
+</Tab>
+
+<Tab title="Metadata">
+View performance metrics and metadata:
+- Request ID: `req_abc123xyz`
+- Created: `2024-03-10 14:32:15 UTC`
+- Latency: `1,234 ms`
+- Time to First Token: `234 ms`
+- Status: `200 OK`
+- Provider: `OpenAI`
+- Model: `gpt-4o-mini`
+- Cost: `$0.0042`
+- User ID: `user-123`
+- Custom Properties: `Environment: production, Feature: chat`
+</Tab>
+</Tabs>
+
+## Filtering Requests
+
+### Built-in Filters
+
+Use the dashboard's filter interface to narrow down requests:
+
+**Time Range**
+- Last hour, day, week, month
+- Custom date range picker
+- Timezone-aware filtering
+
+**Model & Provider**
+- Filter by specific model (e.g., `gpt-4o-mini`)
+- Filter by provider (OpenAI, Anthropic, etc.)
+- Include/exclude specific models
+
+**Status**
+- Success (2xx responses)
+- Client errors (4xx)
+- Server errors (5xx)
+- Specific status codes
+
+**User & Properties**
+- Filter by user ID
+- Filter by any custom property
+- Combine multiple property filters
+
+### Advanced Filtering
+
+For complex queries, use the filter builder:
+
+```typescript
+// Example: Production errors from last 24 hours
+{
+  "AND": [
+    { "status": { "gte": 400 } },
+    { "properties.Environment": { "equals": "production" } },
+    { "created_at": { "gte": "2024-03-09T14:00:00Z" } }
+  ]
+}
+```
+
+## Querying via API
+
+Retrieve requests programmatically using the REST API:
+
+### Basic Query
+
+<CodeGroup>
+```bash cURL
+curl --request POST \
+  --url https://api.helicone.ai/v1/request/query-clickhouse \
+  --header "Content-Type: application/json" \
+  --header "Authorization: Bearer $HELICONE_API_KEY" \
+  --data '{
+  "filter": {
+    "request_response_rmt": {
+      "model": {
+        "equals": "gpt-4o-mini"
+      }
+    }
+  },
+  "limit": 100
+}'
+```
+
+```typescript TypeScript
+import { HeliconeClient } from "@helicone/js";
+
+const helicone = new HeliconeClient({
+  apiKey: process.env.HELICONE_API_KEY
+});
+
+const requests = await helicone.query.requests({
+  filter: {
+    request_response_rmt: {
+      model: { equals: "gpt-4o-mini" }
+    }
+  },
+  limit: 100
+});
+```
+
+```python Python
+import os
+import requests
+
+url = "https://api.helicone.ai/v1/request/query-clickhouse"
+headers = {
+    "Content-Type": "application/json",
+    "Authorization": f"Bearer {os.environ['HELICONE_API_KEY']}"
+}
+data = {
+    "filter": {
+        "request_response_rmt": {
+            "model": {"equals": "gpt-4o-mini"}
+        }
+    },
+    "limit": 100
+}
+
+response = requests.post(url, json=data, headers=headers)
+requests_data = response.json()
+```
+</CodeGroup>
+
+### Filter by Custom Properties
+
+<Warning>
+**Important:** When filtering by custom properties, you MUST wrap the `properties` filter inside a `request_response_rmt` object.
+</Warning>
+
+```bash
+curl --request POST \
+  --url https://api.helicone.ai/v1/request/query-clickhouse \
+  --header "Content-Type: application/json" \
+  --header "Authorization: Bearer $HELICONE_API_KEY" \
+  --data '{
+  "filter": {
+    "request_response_rmt": {
+      "properties": {
+        "Environment": {
+          "equals": "production"
+        }
+      }
+    }
+  },
+  "limit": 100
+}'
+```
+
+### Complex Filters
+
+Combine multiple conditions using AND/OR operators:
+
+```bash
+curl --request POST \
+  --url https://api.helicone.ai/v1/request/query-clickhouse \
+  --header "Content-Type: application/json" \
+  --header "Authorization: Bearer $HELICONE_API_KEY" \
+  --data '{
+  "filter": {
+    "left": {
+      "request_response_rmt": {
+        "request_created_at": {
+          "gte": "2024-03-01T00:00:00Z"
+        }
+      }
+    },
+    "operator": "and",
+    "right": {
+      "left": {
+        "request_response_rmt": {
+          "model": {
+            "equals": "gpt-4o-mini"
+          }
+        }
+      },
+      "operator": "and",
+      "right": {
+        "request_response_rmt": {
+          "properties": {
+            "Environment": {
+              "equals": "production"
+            }
+          }
+        }
+      }
+    }
+  },
+  "limit": 1000
+}'
+```
+
+### Export Large Datasets
+
+For exporting large amounts of data, use the CLI tool:
+
+```bash
+# Export all requests from last 30 days
+HELICONE_API_KEY="your-api-key" \
+  npx @helicone/export \
+  --start-date 2024-02-01 \
+  --limit 100000 \
+  --include-body
+
+# Export with property filter to CSV
+HELICONE_API_KEY="your-api-key" \
+  npx @helicone/export \
+  --property Environment=production \
+  --format csv \
+  --include-body
+```
+
+## Common Use Cases
+
+### Debug Failed Requests
+
+1. Filter by status code (4xx or 5xx)
+2. Look for patterns in error messages
+3. Check request parameters and prompts
+4. Verify custom properties (environment, version)
+
+```typescript
+// Add debugging context to every request
+const response = await client.chat.completions.create(
+  { /* request */ },
+  {
+    headers: {
+      "Helicone-Property-Environment": process.env.NODE_ENV,
+      "Helicone-Property-Version": packageJson.version,
+      "Helicone-Property-RequestType": "user_chat",
+      "Helicone-User-Id": userId
+    }
+  }
+);
+```
+
+### Analyze Slow Requests
+
+1. Sort by latency (descending)
+2. Identify patterns in slow requests
+3. Check prompt length and token counts
+4. Compare across models and providers
+
+```typescript
+// Query slow requests via API
+const slowRequests = await fetch('https://api.helicone.ai/v1/request/query-clickhouse', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${HELICONE_API_KEY}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    filter: {
+      request_response_rmt: {
+        latency: { gte: 5000 } // >= 5 seconds
+      }
+    },
+    limit: 100
+  })
+});
+```
+
+### Track User-Specific Issues
+
+1. Filter by user ID
+2. Review their request history
+3. Check for error patterns
+4. Analyze usage patterns
+
+```typescript
+// Tag all requests with user ID
+const response = await client.chat.completions.create(
+  { /* request */ },
+  {
+    headers: {
+      "Helicone-User-Id": userId,
+      "Helicone-Property-UserTier": userTier,
+      "Helicone-Property-Feature": featureName
+    }
+  }
+);
+```
+
+### Monitor Cost by Feature
+
+1. Filter by custom property (e.g., `Feature`)
+2. Sum costs across requests
+3. Compare costs across features
+4. Identify cost optimization opportunities
+
+```typescript
+// Tag requests by feature
+const features = ['chat', 'summarize', 'translate', 'analyze'];
+
+for (const feature of features) {
+  await client.chat.completions.create(
+    { /* request */ },
+    {
+      headers: {
+        "Helicone-Property-Feature": feature,
+        "Helicone-Property-Environment": "production"
+      }
+    }
+  );
+}
+
+// Query costs by feature via dashboard or API
+```
+
+## Request Metadata
+
+### Custom Request IDs
+
+Provide your own request ID for easy reference:
+
+```typescript
+import { randomUUID } from "crypto";
+
+const requestId = randomUUID();
+
+const response = await client.chat.completions.create(
+  { /* request */ },
+  {
+    headers: {
+      "Helicone-Request-Id": requestId
+    }
+  }
+);
+
+// Later, query by this ID
+const requestDetails = await fetch(
+  `https://api.helicone.ai/v1/request/${requestId}`
+);
+```
+
+### Excluding Sensitive Data
+
+Omit request or response bodies for sensitive data:
+
+```typescript
+const response = await client.chat.completions.create(
+  {
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Sensitive information..." }]
+  },
+  {
+    headers: {
+      "Helicone-Omit-Request": "true",   // Don't log request body
+      "Helicone-Omit-Response": "true"   // Don't log response body
+    }
+  }
+);
+```
+
+## Performance Metrics
+
+### Time to First Token (TTFT)
+
+For streaming requests, Helicone tracks when the first token arrives:
+
+```typescript
+const stream = await client.chat.completions.create(
+  {
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Write a story..." }],
+    stream: true
+  },
+  {
+    headers: {
+      "Helicone-Property-Feature": "story_generation"
+    }
+  }
+);
+
+// TTFT is automatically tracked and visible in the dashboard
+```
+
+### Latency Analysis
+
+Analyze latency patterns:
+- **p50 (median)**: Typical latency
+- **p95**: 95th percentile - catches slow outliers
+- **p99**: 99th percentile - identifies worst-case performance
+
+## Related Features
+
+<CardGroup cols={2}>
+<Card title="Sessions" icon="diagram-project" href="/observability/sessions">
+Group related requests into sessions for workflow tracking
+</Card>
+
+<Card title="Custom Properties" icon="tags" href="/observability/custom-properties">
+Add metadata to requests for filtering and analysis
+</Card>
+
+<Card title="User Metrics" icon="users" href="/features/advanced-usage/user-metrics">
+Analyze per-user costs and usage patterns
+</Card>
+
+<Card title="Alerts" icon="bell" href="/features/alerts">
+Get notified about errors, rate limits, or cost thresholds
+</Card>
+</CardGroup>
+
+<QuestionsSection />

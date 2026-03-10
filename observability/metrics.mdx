@@ -1,0 +1,588 @@
+---
+title: "Metrics & Analytics"
+sidebarTitle: "Metrics"
+description: "Analyze aggregate metrics across requests, sessions, and users to understand system-wide performance, costs, and usage patterns"
+"twitter:title": "Metrics - Helicone OSS LLM Observability"
+---
+
+import QuestionsSection from "/snippets/questions-section.mdx";
+
+While individual requests show you what happened, metrics reveal **patterns** and **trends** across your entire LLM application. Helicone aggregates data from all your requests to provide actionable insights about performance, costs, usage, and quality.
+
+## Key Metrics Categories
+
+<CardGroup cols={2}>
+<Card title="Usage Metrics" icon="chart-line">
+- Request volume over time
+- Active users (daily, weekly, monthly)
+- Requests per user
+- Model usage distribution
+- Provider distribution
+</Card>
+
+<Card title="Performance Metrics" icon="gauge">
+- Latency percentiles (p50, p95, p99)
+- Time to first token (TTFT)
+- Throughput (requests/second)
+- Error rates by model and provider
+- Cache hit rates
+</Card>
+
+<Card title="Cost Metrics" icon="dollar-sign">
+- Total spend over time
+- Cost per user
+- Cost per feature/workflow
+- Cost by model and provider
+- Token usage and costs
+</Card>
+
+<Card title="Quality Metrics" icon="star">
+- Success rate (2xx vs errors)
+- User feedback scores
+- Retry rates
+- Session completion rates
+- Average response length
+</Card>
+</CardGroup>
+
+## Dashboard Overview
+
+The Helicone dashboard provides real-time metrics visualization at [helicone.ai/dashboard](https://helicone.ai/dashboard):
+
+### High-Level Metrics
+
+At the top of your dashboard, see your key metrics at a glance:
+
+- **Total Requests**: Request count for the selected time period
+- **Total Cost**: Cumulative cost across all requests
+- **Average Latency**: Mean latency across all requests
+- **Error Rate**: Percentage of failed requests (4xx/5xx)
+- **Active Users**: Unique users making requests
+
+### Time-Series Graphs
+
+Visualize trends over time:
+
+- **Requests Over Time**: See usage patterns and identify spikes
+- **Cost Over Time**: Track spending trends and budget
+- **Latency Over Time**: Monitor performance degradation
+- **Errors Over Time**: Identify reliability issues
+
+### Breakdowns
+
+Understand your usage composition:
+
+- **By Model**: Which models are used most
+- **By Provider**: OpenAI, Anthropic, Google, etc.
+- **By User**: Top users by request count or cost
+- **By Property**: Custom property breakdowns (environment, feature, etc.)
+
+## Request Metrics
+
+### Volume & Distribution
+
+Track how many requests you're making:
+
+```typescript
+// Query request count over time
+GET /v1/metrics/requests?timeFilter=last_7_days&groupBy=day
+
+// Response
+{
+  "data": [
+    { "date": "2024-03-01", "count": 1234 },
+    { "date": "2024-03-02", "count": 1456 },
+    { "date": "2024-03-03", "count": 1389 }
+  ]
+}
+```
+
+### Latency Analysis
+
+Understand request performance:
+
+**Percentiles explained:**
+- **p50 (median)**: Half of requests are faster, half are slower
+- **p95**: 95% of requests are faster - identifies slow outliers
+- **p99**: 99% of requests are faster - catches worst-case scenarios
+
+```typescript
+// Query latency percentiles
+{
+  "latency": {
+    "p50": 234,   // 50% of requests < 234ms
+    "p95": 1245,  // 95% of requests < 1245ms
+    "p99": 2103   // 99% of requests < 2103ms
+  }
+}
+```
+
+**What to watch:**
+- **p50 increasing**: Overall performance degrading
+- **p95/p99 spikes**: Some requests becoming very slow
+- **Large p99-p50 gap**: Inconsistent performance
+
+### Time to First Token (TTFT)
+
+For streaming requests, TTFT measures perceived responsiveness:
+
+```typescript
+// Average TTFT by model
+{
+  "gpt-4o": 234,
+  "gpt-4o-mini": 123,
+  "claude-3.5-sonnet-v2": 189
+}
+```
+
+**Why it matters:**
+- Lower TTFT = faster perceived response
+- Critical for chat interfaces
+- Varies significantly by model
+
+### Error Rates
+
+Track request failures:
+
+```typescript
+// Error rate breakdown
+{
+  "total_requests": 10000,
+  "successful": 9845,
+  "errors": {
+    "4xx": 123,  // Client errors (bad requests)
+    "5xx": 32    // Server errors (provider issues)
+  },
+  "error_rate": 1.55  // percentage
+}
+```
+
+**Common error patterns:**
+- **429 (Rate Limit)**: Hitting provider rate limits
+- **400 (Bad Request)**: Invalid request parameters
+- **500 (Server Error)**: Provider outages
+- **503 (Service Unavailable)**: Provider capacity issues
+
+## Session Metrics
+
+For workflows using sessions, track aggregate session metrics:
+
+### Session Performance
+
+```typescript
+// Query session metrics
+POST /v1/session/metrics/query
+{
+  "nameContains": "Research Agent",
+  "timezoneDifference": 0
+}
+
+// Response
+{
+  "data": {
+    "totalSessions": 1234,
+    "avgDuration": 12.5,      // seconds
+    "avgCost": 0.0234,        // dollars
+    "avgRequestCount": 4.2,
+    "successRate": 94.5       // percentage
+  }
+}
+```
+
+### Session Cost Analysis
+
+Understand the cost of complete workflows:
+
+- **Total session cost**: Sum of all requests in the session
+- **Cost distribution**: Which parts of the workflow are most expensive
+- **Cost per success**: Total cost divided by successful sessions
+
+## User Metrics
+
+Analyze per-user behavior and costs:
+
+### User Activity
+
+```typescript
+// Query user metrics
+POST /v1/user/metricsquery
+{
+  "timeFilter": {
+    "startTimeUnixMs": 1709222400000,
+    "endTimeUnixMs": 1709308800000
+  }
+}
+
+// Response
+{
+  "data": [
+    {
+      "userId": "user-123",
+      "requestCount": 234,
+      "totalCost": 1.23,
+      "avgLatency": 456,
+      "lastActive": "2024-03-10T14:32:15Z"
+    }
+  ]
+}
+```
+
+### User Segmentation
+
+Group users by behavior:
+
+- **Power Users**: Top 10% by request volume
+- **Active Users**: Made requests in last 7 days
+- **New Users**: First request in last 30 days
+- **At-Risk Users**: Declining usage patterns
+
+### User Costs
+
+Track spending per user:
+
+```typescript
+// Calculate cost per user
+{
+  "totalCost": 1234.56,
+  "totalUsers": 5000,
+  "avgCostPerUser": 0.25,
+  "topUsersCost": {
+    "user-123": 45.67,
+    "user-456": 23.45,
+    "user-789": 19.23
+  }
+}
+```
+
+## Cost Metrics
+
+### Total Spend
+
+Track your LLM spending over time:
+
+```typescript
+// Daily cost breakdown
+{
+  "data": [
+    {
+      "date": "2024-03-01",
+      "cost": 123.45,
+      "requestCount": 10234
+    },
+    {
+      "date": "2024-03-02",
+      "cost": 145.67,
+      "requestCount": 11456
+    }
+  ]
+}
+```
+
+### Cost by Model
+
+Understand which models drive costs:
+
+```typescript
+{
+  "gpt-4o": {
+    "cost": 456.78,
+    "percentage": 45.2
+  },
+  "gpt-4o-mini": {
+    "cost": 234.56,
+    "percentage": 23.2
+  },
+  "claude-3.5-sonnet-v2": {
+    "cost": 345.67,
+    "percentage": 34.1
+  }
+}
+```
+
+### Cost by Custom Property
+
+Segment costs by any dimension:
+
+```typescript
+// Cost by feature
+{
+  "chat": 234.56,
+  "summarize": 123.45,
+  "translate": 89.12,
+  "analyze": 456.78
+}
+
+// Cost by environment
+{
+  "production": 789.12,
+  "staging": 45.67,
+  "development": 12.34
+}
+```
+
+### Token Usage
+
+Track token consumption:
+
+```typescript
+{
+  "totalTokens": 12345678,
+  "promptTokens": 8234567,
+  "completionTokens": 4111111,
+  "avgTokensPerRequest": 1234,
+  "estimatedCost": 1234.56
+}
+```
+
+## Performance Optimization
+
+### Identifying Slow Requests
+
+Use metrics to find performance bottlenecks:
+
+1. **Sort by latency**: Find slowest requests
+2. **Check patterns**: Do slow requests share characteristics?
+3. **Analyze prompts**: Are slow requests using longer prompts?
+4. **Compare models**: Are certain models consistently slower?
+
+```typescript
+// Query slow requests
+POST /v1/request/query-clickhouse
+{
+  "filter": {
+    "request_response_rmt": {
+      "latency": { "gte": 5000 }  // >= 5 seconds
+    }
+  },
+  "sort": {
+    "key": "latency",
+    "direction": "desc"
+  },
+  "limit": 100
+}
+```
+
+### Cache Hit Rate
+
+Track cache effectiveness:
+
+```typescript
+{
+  "totalRequests": 10000,
+  "cacheHits": 2345,
+  "cacheMisses": 7655,
+  "hitRate": 23.45,        // percentage
+  "costSaved": 123.45      // dollars saved from cache
+}
+```
+
+**Optimizing cache:**
+- High hit rate (&gt;30%): Cache working well
+- Low hit rate (&lt;10%): Review cache strategy
+- Consider increasing cache bucket size
+- Check cache TTL settings
+
+## Cost Optimization
+
+### Model Selection
+
+Compare costs across models:
+
+```typescript
+// Cost per request by model
+{
+  "gpt-4o": 0.0456,           // More expensive, higher quality
+  "gpt-4o-mini": 0.0123,      // Cheaper, good quality
+  "claude-3.5-haiku": 0.0089  // Cheapest, fast
+}
+```
+
+**Optimization strategies:**
+- Use cheaper models for simple tasks
+- Reserve expensive models for complex tasks
+- A/B test model quality vs cost
+- Implement model fallbacks
+
+### Prompt Optimization
+
+Reduce token usage:
+
+```typescript
+// Analyze token usage by prompt type
+{
+  "system_prompts": {
+    "avgTokens": 234,
+    "costPerRequest": 0.0012
+  },
+  "user_prompts": {
+    "avgTokens": 456,
+    "costPerRequest": 0.0023
+  }
+}
+```
+
+**Reduction tactics:**
+- Shorten system prompts
+- Remove redundant instructions
+- Use fewer examples in few-shot prompts
+- Implement prompt compression
+
+### Feature Cost Analysis
+
+Identify expensive features:
+
+```typescript
+// Filter by custom property to see feature costs
+POST /v1/request/query-clickhouse
+{
+  "filter": {
+    "request_response_rmt": {
+      "properties": {
+        "Feature": { "equals": "summarization" }
+      }
+    }
+  }
+}
+
+// Calculate total cost for this feature
+```
+
+## Custom Metric Tracking
+
+Add custom properties to enable rich analytics:
+
+```typescript
+const response = await client.chat.completions.create(
+  { /* request */ },
+  {
+    headers: {
+      // Dimensions for cost analysis
+      "Helicone-Property-Feature": "chat",
+      "Helicone-Property-Environment": "production",
+      "Helicone-Property-UserTier": "premium",
+      
+      // Dimensions for performance analysis
+      "Helicone-Property-RequestType": "streaming",
+      "Helicone-Property-Priority": "high",
+      
+      // Dimensions for quality analysis
+      "Helicone-Property-TaskComplexity": "medium",
+      "Helicone-Property-Category": "support"
+    }
+  }
+);
+
+// Now you can analyze metrics by any of these dimensions
+```
+
+## Alerts & Monitoring
+
+Set up alerts based on metrics:
+
+### Cost Alerts
+
+- Daily spend exceeds threshold
+- User spend exceeds limit
+- Unusual cost spike detected
+
+### Performance Alerts
+
+- Latency p95 exceeds threshold
+- Error rate exceeds threshold
+- TTFT degradation detected
+
+### Usage Alerts
+
+- Request rate spike
+- Unusual traffic pattern
+- Provider rate limit approaching
+
+## Exporting Metrics
+
+### API Export
+
+Export metrics for external analysis:
+
+```bash
+# Export requests with metrics
+HELICONE_API_KEY="your-key" \
+  npx @helicone/export \
+  --start-date 2024-03-01 \
+  --end-date 2024-03-31 \
+  --format csv \
+  --include-body
+```
+
+### Data Warehouse Integration
+
+Integrate with your data warehouse:
+
+1. Export data via API
+2. Load into your warehouse (Snowflake, BigQuery, etc.)
+3. Join with your business data
+4. Build custom dashboards
+
+```sql
+-- Example: Join Helicone data with user data
+SELECT 
+  u.user_id,
+  u.subscription_tier,
+  h.request_count,
+  h.total_cost,
+  h.avg_latency
+FROM users u
+LEFT JOIN helicone_metrics h ON u.user_id = h.user_id
+WHERE h.date >= '2024-03-01'
+```
+
+## Best Practices
+
+### Metric Collection
+
+✅ **Do:**
+- Tag all requests with custom properties for rich segmentation
+- Use consistent property names across your application
+- Track both business and technical metrics
+- Set up alerts for critical metrics
+
+❌ **Don't:**
+- Collect metrics without acting on them
+- Use inconsistent property names
+- Ignore low-level metrics (they reveal patterns)
+- Wait for issues to become critical
+
+### Metric Analysis
+
+✅ **Do:**
+- Review metrics weekly to identify trends
+- Compare across time periods (week-over-week, month-over-month)
+- Segment by user cohorts and features
+- Look for correlations between metrics
+
+❌ **Don't:**
+- Look at metrics in isolation
+- Ignore gradual degradation
+- Focus only on averages (check percentiles too)
+- Optimize prematurely without data
+
+## Related Features
+
+<CardGroup cols={2}>
+<Card title="Requests" icon="file-lines" href="/observability/requests">
+Drill down into individual requests from metrics
+</Card>
+
+<Card title="Custom Properties" icon="tags" href="/observability/custom-properties">
+Add dimensions for richer metric analysis
+</Card>
+
+<Card title="User Metrics" icon="users" href="/features/advanced-usage/user-metrics">
+Deep dive into user-level analytics
+</Card>
+
+<Card title="Alerts" icon="bell" href="/features/alerts">
+Set up alerts based on metric thresholds
+</Card>
+</CardGroup>
+
+<QuestionsSection />

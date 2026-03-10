@@ -1,0 +1,457 @@
+---
+title: "Fine-Tuning LLMs with Helicone"
+description: "Prepare datasets, manage fine-tuning jobs, and track custom model performance with Helicone and OpenPipe"
+sidebarTitle: "Fine-Tuning"
+---
+
+Fine-tuning adapts pre-trained models to your specific use case, improving quality and reducing costs for specialized tasks. Helicone integrates with [OpenPipe](https://openpipe.ai) to streamline the entire fine-tuning workflow.
+
+## When to Fine-Tune
+
+Fine-tuning is ideal when:
+
+<CardGroup cols={2}>
+  <Card title="Specialized Domain" icon="graduation-cap">
+    Your domain requires specialized knowledge (medical, legal, technical)
+  </Card>
+  <Card title="Consistent Format" icon="table-list">
+    You need consistent output formatting that prompting can't achieve
+  </Card>
+  <Card title="Cost Optimization" icon="dollar-sign">
+    High volume makes a smaller fine-tuned model more economical
+  </Card>
+  <Card title="Latency Requirements" icon="gauge-high">
+    You need faster responses than larger models provide
+  </Card>
+</CardGroup>
+
+<Warning>
+  **Don't fine-tune if:** You're just starting out, need flexibility to change behavior frequently, or have less than 50 high-quality examples. Start with prompt engineering instead.
+</Warning>
+
+## Fine-Tuning Workflow
+
+<Steps>
+  <Step title="Set Up OpenPipe Integration">
+    Connect your Helicone account to OpenPipe:
+
+    1. Navigate to **Settings → Integrations** in your Helicone dashboard
+    2. Find the **OpenPipe** integration
+    3. Click **Connect** and authorize the integration
+
+    <Frame caption="OpenPipe integration in Helicone settings">
+      <img
+        src="/images/use-cases/fine-tune/openpipe-integration.webp"
+        alt="OpenPipe integration configuration in Helicone dashboard"
+      />
+    </Frame>
+
+    This allows you to manage fine-tuning datasets and jobs directly from Helicone.
+  </Step>
+
+  <Step title="Collect Training Data">
+    Fine-tuning requires high-quality training examples. You can:
+
+    **Option 1: Use Production Data**
+    
+    Select successful requests from your production traffic:
+
+    ```typescript
+    // Tag high-quality responses
+    const response = await client.chat.completions.create(
+      params,
+      {
+        headers: {
+          "Helicone-Property-Quality": "high",
+          "Helicone-Property-Use-For-Training": "true",
+        },
+      }
+    );
+    ```
+
+    Then filter by these properties in Helicone to export training data.
+
+    **Option 2: Create Synthetic Data**
+
+    Generate examples programmatically:
+
+    ```python
+    from openai import OpenAI
+
+    client = OpenAI(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        base_url="https://oai.helicone.ai/v1",
+        default_headers={
+            "Helicone-Auth": f"Bearer {os.getenv('HELICONE_API_KEY')}"
+        }
+    )
+
+    # Generate training examples
+    training_examples = []
+    for scenario in scenarios:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Generate a training example..."},
+                {"role": "user", "content": scenario}
+            ],
+            extra_headers={
+                "Helicone-Property-Type": "synthetic-training-data"
+            }
+        )
+        training_examples.append({
+            "input": scenario,
+            "output": response.choices[0].message.content
+        })
+    ```
+  </Step>
+
+  <Step title="Create a Training Dataset">
+    In the Helicone dashboard:
+
+    1. Go to **Datasets** → **Create New Dataset**
+    2. Select requests to include (filter by your training properties)
+    3. Review and clean the data
+    4. Export to OpenPipe
+
+    <Frame caption="Creating a fine-tuning dataset in Helicone">
+      <img
+        src="/images/use-cases/fine-tune/dataset.webp"
+        alt="Dataset creation interface showing request selection"
+      />
+    </Frame>
+
+    <Tip>
+      **Quality over quantity**: Start with 50-200 high-quality examples. More data doesn't always mean better results.
+    </Tip>
+
+    ### Dataset Best Practices
+
+    <AccordionGroup>
+      <Accordion title="Diverse Examples" icon="grid">
+        Include variety in your training data:
+        - Different input lengths
+        - Various edge cases
+        - Multiple query types
+        - Representative of production distribution
+      </Accordion>
+
+      <Accordion title="Consistent Formatting" icon="align-left">
+        Ensure all examples follow the same structure:
+        - Identical system prompts
+        - Consistent output format
+        - Same level of detail
+      </Accordion>
+
+      <Accordion title="High-Quality Labels" icon="star">
+        Every example should be:
+        - Factually correct
+        - Following your desired style
+        - Representative of ideal behavior
+        - Free of errors or inconsistencies
+      </Accordion>
+    </AccordionGroup>
+  </Step>
+
+  <Step title="Configure Fine-Tuning Job">
+    Click **Start Fine-Tuning** and configure:
+
+    - **Base Model**: Start with a model family (GPT-4o, GPT-3.5, etc.)
+    - **Training Epochs**: Usually 3-5 (more risks overfitting)
+    - **Learning Rate**: Use automatic or adjust based on results
+    - **Validation Split**: Hold out 10-20% for validation
+
+    <Frame caption="Fine-tuning configuration interface">
+      <img
+        src="/images/use-cases/fine-tune/fine-tune-config.webp"
+        alt="Configuration options for fine-tuning job parameters"
+      />
+    </Frame>
+
+    <Note>
+      Fine-tuning jobs typically take 10 minutes to a few hours depending on dataset size and model.
+    </Note>
+  </Step>
+
+  <Step title="Monitor Training Progress">
+    Track your fine-tuning job in real-time:
+
+    - **Training loss**: Should decrease steadily
+    - **Validation loss**: Should decrease without diverging from training
+    - **Estimated completion time**
+
+    <Frame caption="Fine-tuning progress monitoring">
+      <img
+        src="/images/features/fine-tuning/fine-tune-job.png"
+        alt="Training progress dashboard showing loss curves"
+      />
+    </Frame>
+
+    If validation loss starts increasing while training loss decreases, you're overfitting - stop training early.
+  </Step>
+
+  <Step title="Evaluate the Fine-Tuned Model">
+    Once training completes, test your model:
+
+    ```typescript
+    import { OpenAI } from "openai";
+
+    const client = new OpenAI({
+      baseURL: "https://oai.helicone.ai/v1",
+      apiKey: process.env.OPENAI_API_KEY,
+      defaultHeaders: {
+        "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+      },
+    });
+
+    // Use your fine-tuned model
+    const response = await client.chat.completions.create(
+      {
+        model: "ft:gpt-4o-mini-2024-07-18:your-org:model-name:xyz123",
+        messages: [
+          { role: "user", content: "Test input" }
+        ],
+      },
+      {
+        headers: {
+          "Helicone-Property-Model-Type": "fine-tuned",
+          "Helicone-Property-Base-Model": "gpt-4o-mini",
+        },
+      }
+    );
+    ```
+
+    Compare outputs against:
+    - Base model performance
+    - Your validation set expectations
+    - Production requirements
+  </Step>
+
+  <Step title="Deploy and Monitor">
+    Deploy your fine-tuned model to production:
+
+    ```python
+    def get_model(use_finetuned: bool = True):
+        if use_finetuned:
+            return "ft:gpt-4o-mini-2024-07-18:your-org:model:xyz123"
+        return "gpt-4o-mini"  # Fallback
+
+    response = client.chat.completions.create(
+        model=get_model(),
+        messages=messages,
+        extra_headers={
+            "Helicone-Property-Model-Version": "fine-tuned-v1",
+            "Helicone-Property-Deployment": "production"
+        }
+    )
+    ```
+
+    Track performance metrics:
+    - Response quality vs. base model
+    - Cost per request
+    - Latency improvements
+    - User satisfaction scores
+  </Step>
+</Steps>
+
+## Comparing Fine-Tuned vs Base Models
+
+Run side-by-side comparisons:
+
+```typescript
+async function compareModels(input: string) {
+  const sessionId = `comparison-${Date.now()}`;
+
+  // Base model
+  const baseResponse = await client.chat.completions.create(
+    {
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: input }],
+    },
+    {
+      headers: {
+        "Helicone-Session-Id": sessionId,
+        "Helicone-Property-Model-Type": "base",
+      },
+    }
+  );
+
+  // Fine-tuned model
+  const fineTunedResponse = await client.chat.completions.create(
+    {
+      model: "ft:gpt-4o-mini-2024-07-18:org:model:id",
+      messages: [{ role: "user", content: input }],
+    },
+    {
+      headers: {
+        "Helicone-Session-Id": sessionId,
+        "Helicone-Property-Model-Type": "fine-tuned",
+      },
+    }
+  );
+
+  return {
+    base: baseResponse.choices[0].message.content,
+    fineTuned: fineTunedResponse.choices[0].message.content,
+  };
+}
+```
+
+View both responses in the same session to compare quality, cost, and latency.
+
+## Cost Analysis
+
+Fine-tuning economics depend on volume:
+
+### Example Calculation
+
+**Scenario**: 100,000 requests/month, 500 input + 200 output tokens each
+
+<Tabs>
+  <Tab title="GPT-4o (Base)">
+    ```
+    Input:  100k * 500 tokens * $2.50/1M = $125
+    Output: 100k * 200 tokens * $10.00/1M = $200
+    Total: $325/month
+    ```
+  </Tab>
+
+  <Tab title="GPT-4o-mini Fine-Tuned">
+    ```
+    Training: $50 (one-time)
+    Input:  100k * 500 tokens * $0.30/1M = $15
+    Output: 100k * 200 tokens * $1.20/1M = $24
+    Total: $39/month + $50 upfront
+    
+    Break-even: 0.2 months
+    Savings: $286/month (88%)
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+  These are example calculations. Actual costs depend on your provider, model, and usage patterns. Always test with your own data.
+</Warning>
+
+## Iterating on Fine-Tuned Models
+
+Improve your model over time:
+
+### Collect Feedback
+
+```typescript
+// Track which responses need improvement
+await fetch(`https://api.helicone.ai/v1/request/${requestId}/score`, {
+  method: "POST",
+  headers: {
+    "Authorization": `Bearer ${HELICONE_API_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    scores: {
+      "user-satisfaction": userRating,
+      "needs-retraining": userRating < 3 ? 1 : 0,
+    },
+  }),
+});
+```
+
+### Create New Training Data
+
+Filter for low-scoring responses and correct them:
+
+```python
+# Query requests needing correction
+response = requests.post(
+    "https://api.helicone.ai/v1/request/query",
+    headers={"Authorization": f"Bearer {HELICONE_API_KEY}"},
+    json={
+        "filter": {
+            "properties": {
+                "Model-Type": "fine-tuned"
+            },
+            "scores": {
+                "needs-retraining": {"gte": 1}
+            }
+        }
+    }
+)
+
+# Export and manually correct these examples
+problematic_requests = response.json()["data"]
+```
+
+### Retrain Periodically
+
+Create new versions as you collect more data:
+
+- **Monthly**: Add new high-quality examples
+- **Quarterly**: Major updates with improved examples
+- **Annually**: Evaluate if a newer base model would perform better
+
+## Troubleshooting
+
+### Poor Performance After Fine-Tuning
+
+<AccordionGroup>
+  <Accordion title="Overfitting" icon="chart-line">
+    **Symptoms**: Great on training data, poor on new inputs
+    
+    **Solutions**:
+    - Reduce training epochs (try 2-3 instead of 5+)
+    - Add more diverse training examples
+    - Use a larger validation set (20%)
+  </Accordion>
+
+  <Accordion title="Insufficient Data" icon="database">
+    **Symptoms**: Model behavior is inconsistent
+    
+    **Solutions**:
+    - Collect 2-3x more examples
+    - Focus on quality over quantity
+    - Use data augmentation to increase variety
+  </Accordion>
+
+  <Accordion title="Wrong Base Model" icon="robot">
+    **Symptoms**: No improvement over base model
+    
+    **Solutions**:
+    - Try a different base model family
+    - Ensure task matches model capabilities
+    - Verify training data format is correct
+  </Accordion>
+</AccordionGroup>
+
+## Fine-Tuning Resources
+
+<CardGroup cols={2}>
+  <Card title="Training Data Best Practices" icon="graduation-cap" href="https://openpipe.ai/blog/fine-tuning-best-practices-series-introduction-and-chapter-1-training-data">
+    Deep dive into creating effective training datasets
+  </Card>
+  <Card title="Model Selection Guide" icon="sliders" href="https://openpipe.ai/blog/fine-tuning-best-practices-chapter-2-models">
+    Choosing the right base model for fine-tuning
+  </Card>
+  <Card title="RAG vs Fine-Tuning" icon="scale-balanced" href="/faq/rag-vs-fine-tuning">
+    When to use each approach
+  </Card>
+  <Card title="OpenAI Fine-Tuning API" icon="code" href="/faq/openai-fine-tuning-api">
+    Direct API usage without OpenPipe
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Cost Tracking" icon="dollar-sign" href="/guides/cost-tracking">
+    Monitor fine-tuned model economics
+  </Card>
+  <Card title="Experiments" icon="flask" href="/guides/experiments">
+    A/B test fine-tuned vs base models
+  </Card>
+  <Card title="RAGAS Evaluations" icon="chart-line" href="/guides/tutorials/ragas-evals">
+    Evaluate fine-tuned model quality systematically
+  </Card>
+  <Card title="OpenPipe Integration" icon="link" href="https://openpipe.ai">
+    Learn more about the OpenPipe platform
+  </Card>
+</CardGroup>

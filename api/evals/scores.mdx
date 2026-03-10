@@ -1,0 +1,56 @@
+---
+title: "Get Evaluation Scores"
+sidebarTitle: "Get Evaluation Scores"
+description: "Retrieve all unique evaluation score names for your organization"
+openapi: get /v1/evals/scores
+---
+
+This endpoint returns a list of all unique evaluation score names that have been created for your organization. Use this to discover what evaluation metrics are available and to build evaluation filtering interfaces.
+
+## Use Cases
+
+- Discover all evaluation metrics in use
+- Build dynamic filtering UI for evaluations
+- Audit evaluation naming conventions
+- Populate dropdown menus for evaluation selection
+
+## Response
+
+Returns a Result object containing an array of evaluation score names.
+
+<ResponseField name="data" type="string[]">
+  Array of unique evaluation score names (e.g., ["accuracy", "relevance", "quality"])
+</ResponseField>
+
+<ResponseField name="error" type="string | null">
+  Error message if the request failed, null otherwise
+</ResponseField>
+
+## Example Request
+
+```bash
+curl --request GET \
+  --url https://api.helicone.ai/v1/evals/scores \
+  --header 'Authorization: Bearer <YOUR_API_KEY>'
+```
+
+## Example Response
+
+```json
+{
+  "data": [
+    "accuracy",
+    "relevance",
+    "quality",
+    "coherence",
+    "factuality"
+  ],
+  "error": null
+}
+```
+
+## Notes
+
+- Results are cached for 5 minutes for performance
+- Only returns score names that have been used at least once
+- Score names are case-sensitive

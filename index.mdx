@@ -1,97 +1,172 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Helicone - Open Source LLM Observability Platform"
+description: "Monitor, evaluate, and route requests to 100+ AI models with the leading open-source LLM observability platform and AI Gateway"
 ---
 
-## Setting up
+<div className="bg-gradient-to-br from-[#e4f0f7] to-white py-16 px-4 rounded-xl border border-[#3188ad]/20 shadow-lg mb-12">
+  <div className="max-w-4xl mx-auto text-center">
+    <h1 className="text-5xl font-bold text-gray-900 mb-6">
+      The Open Source LLM Observability Platform
+    </h1>
+    <p className="text-xl text-gray-700 mb-8 leading-relaxed">
+      Monitor, evaluate, and route requests to 100+ AI models. Built for developers who need production-grade observability and intelligent routing.
+    </p>
+    <div className="flex flex-wrap gap-4 justify-center">
+      <a 
+        href="/quick-start" 
+        className="inline-block bg-[#1491ff] text-white font-semibold px-8 py-4 rounded-md hover:bg-[#0d7de8] transition-colors shadow-md"
+      >
+        Get Started →
+      </a>
+      <a 
+        href="https://github.com/helicone/helicone" 
+        className="inline-block bg-white text-[#0a0a0a] font-semibold px-8 py-4 rounded-md hover:bg-gray-50 transition-colors shadow-md border border-gray-200"
+      >
+        View on GitHub
+      </a>
+    </div>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+## Why Helicone?
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={3}>
+  <Card title="AI Gateway" icon="network-wired" href="/gateway/overview">
+    Access 100+ AI models with one unified API. Intelligent routing, automatic fallbacks, and unified observability built in.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Full Observability" icon="chart-line" href="/observability/overview">
+    Track every request, session, and trace. Monitor cost, latency, and quality across your entire AI stack.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Open Source" icon="code-branch" href="https://github.com/helicone/helicone">
+    Self-host with Docker or Kubernetes. Your data stays under your control. Apache 2.0 licensed.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Key Features
 
-Everything you need to create world-class documentation.
+<CardGroup cols={2}>
+  <Card title="Prompt Management" icon="file-code" href="/prompts/overview">
+    Version and deploy prompts without code changes. Test iterations with production data.
+  </Card>
+  <Card title="Session Tracking" icon="diagram-project" href="/observability/sessions">
+    Trace complex agent workflows and multi-step processes end-to-end.
+  </Card>
+  <Card title="Evaluation Framework" icon="flask" href="/evaluation/overview">
+    Score and evaluate responses. Build datasets from production traffic.
+  </Card>
+  <Card title="Cost Analytics" icon="dollar-sign" href="/guides/cost-tracking">
+    Track spending across providers. Identify expensive patterns and optimize costs.
+  </Card>
+  <Card title="Response Caching" icon="database" href="/features/caching">
+    Reduce costs by up to 90% with intelligent response caching.
+  </Card>
+  <Card title="Rate Limiting" icon="gauge-high" href="/features/rate-limiting">
+    Control usage per user, team, or API key with custom rate limits.
+  </Card>
+</CardGroup>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+## Quick Start
 
-## Need inspiration?
+Get your first request logged in under 2 minutes:
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<Steps>
+  <Step title="Sign up and get your API key">
+    Create a free account at [helicone.ai](https://helicone.ai/signup) and generate your API key.
+  </Step>
+  
+  <Step title="Send a request through the AI Gateway">
+    <Tabs>
+      <Tab title="TypeScript">
+        ```typescript
+        import { OpenAI } from "openai";
+
+        const client = new OpenAI({
+          baseURL: "https://ai-gateway.helicone.ai",
+          apiKey: process.env.HELICONE_API_KEY,
+        });
+
+        const response = await client.chat.completions.create({
+          model: "gpt-4o-mini", // Or any of 100+ models
+          messages: [{ role: "user", content: "Hello!" }],
+        });
+        ```
+      </Tab>
+      
+      <Tab title="Python">
+        ```python
+        from openai import OpenAI
+
+        client = OpenAI(
+            base_url="https://ai-gateway.helicone.ai",
+            api_key=os.getenv("HELICONE_API_KEY")
+        )
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": "Hello!"}]
+        )
+        ```
+      </Tab>
+      
+      <Tab title="cURL">
+        ```bash
+        curl https://ai-gateway.helicone.ai/chat/completions \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $HELICONE_API_KEY" \
+          -d '{
+            "model": "gpt-4o-mini",
+            "messages": [{"role": "user", "content": "Hello!"}]
+          }'
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+  
+  <Step title="View your logs">
+    Navigate to your [dashboard](https://us.helicone.ai/dashboard) to see requests, costs, and performance metrics.
+  </Step>
+</Steps>
+
+## Supported Providers
+
+Access 100+ models from leading AI providers through a single API:
+
+<CardGroup cols={4}>
+  <Card title="OpenAI" icon="square" href="/integrations/openai">
+    GPT-4, GPT-4o, GPT-3.5
+  </Card>
+  <Card title="Anthropic" icon="brain" href="/integrations/anthropic">
+    Claude 3.5, Claude 3 Opus
+  </Card>
+  <Card title="Google" icon="google" href="/integrations/overview">
+    Gemini, PaLM, Vertex AI
+  </Card>
+  <Card title="More Providers" icon="plus" href="/gateway/overview">
+    Groq, Together, Anyscale, and more
+  </Card>
+</CardGroup>
+
+## Enterprise Ready
+
+<CardGroup cols={2}>
+  <Card title="Self-Hosting" icon="server" href="/self-hosting/overview">
+    Deploy on your infrastructure with Docker or Kubernetes. Full control over your data.
+  </Card>
+  <Card title="Security & Compliance" icon="shield-halved" href="/features/security">
+    SOC 2 and GDPR compliant. Encryption at rest and in transit.
+  </Card>
+</CardGroup>
+
+## Community & Support
+
+<CardGroup cols={3}>
+  <Card title="Documentation" icon="book" href="/introduction">
+    Comprehensive guides and API reference
+  </Card>
+  <Card title="Discord Community" icon="discord" href="https://discord.com/invite/zsSTcH2qhG">
+    Join 5,000+ developers building with Helicone
+  </Card>
+  <Card title="GitHub" icon="github" href="https://github.com/helicone/helicone">
+    5,000+ stars. Contribute and report issues
+  </Card>
+</CardGroup>

@@ -1,0 +1,258 @@
+---
+title: 'Integrations Overview'
+description: 'Connect Helicone with your favorite AI providers and frameworks'
+icon: 'plug'
+---
+
+Helicone integrates seamlessly with 100+ AI providers and popular frameworks. Choose the integration method that best fits your use case.
+
+## Integration Methods
+
+<CardGroup cols={2}>
+  <Card title="AI Gateway" icon="network-wired" href="/gateway/overview">
+    Route requests through Helicone's AI Gateway for unified access to 100+ models with intelligent routing and automatic fallbacks.
+  </Card>
+  <Card title="Proxy Integration" icon="shuffle" href="#proxy-integration">
+    Route requests through Helicone's proxy by changing your base URL. Simple and works with any provider.
+  </Card>
+  <Card title="Async Logging" icon="bolt" href="/integrations/async-logging">
+    Log requests asynchronously without proxying. Zero latency impact using OpenLLMetry.
+  </Card>
+  <Card title="Custom Headers" icon="code" href="#custom-headers">
+    Add Helicone headers to existing requests for tracking and custom properties.
+  </Card>
+</CardGroup>
+
+## Supported Providers
+
+### Inference Providers
+
+Helicone supports all major AI providers through the AI Gateway:
+
+<CardGroup cols={3}>
+  <Card title="OpenAI" icon="brain" href="/integrations/openai">
+    GPT-4, GPT-4o, GPT-3.5, and more
+  </Card>
+  <Card title="Anthropic" icon="message" href="/integrations/anthropic">
+    Claude 3.5 Sonnet, Claude 3 Opus, and more
+  </Card>
+  <Card title="Google" icon="google">
+    Gemini, PaLM, Vertex AI
+  </Card>
+  <Card title="Azure OpenAI" icon="microsoft">
+    Azure-hosted OpenAI models
+  </Card>
+  <Card title="AWS Bedrock" icon="aws">
+    Claude, Llama, and more on AWS
+  </Card>
+  <Card title="Groq" icon="zap">
+    High-performance inference
+  </Card>
+  <Card title="Together AI" icon="server">
+    Open-source model hosting
+  </Card>
+  <Card title="Anyscale" icon="cloud">
+    Scalable AI inference
+  </Card>
+  <Card title="DeepInfra" icon="microchip">
+    Serverless AI inference
+  </Card>
+</CardGroup>
+
+### Frameworks & Tools
+
+<CardGroup cols={3}>
+  <Card title="LangChain" icon="link" href="/integrations/langchain">
+    Use Helicone with LangChain applications
+  </Card>
+  <Card title="Vercel AI SDK" icon="react" href="/integrations/vercel-ai-sdk">
+    Integrate with Vercel AI SDK
+  </Card>
+  <Card title="LlamaIndex" icon="book">
+    RAG and data framework integration
+  </Card>
+  <Card title="LangGraph" icon="diagram-project">
+    Multi-actor application framework
+  </Card>
+  <Card title="CrewAI" icon="users">
+    Multi-agent orchestration
+  </Card>
+  <Card title="PostHog" icon="chart-line">
+    Export analytics to PostHog
+  </Card>
+</CardGroup>
+
+## Proxy Integration
+
+The simplest way to integrate Helicone is by updating your base URL:
+
+<Tabs>
+  <Tab title="OpenAI">
+    ```typescript
+    import { OpenAI } from "openai";
+
+    const client = new OpenAI({
+      baseURL: "https://oai.helicone.ai/v1",
+      apiKey: process.env.OPENAI_API_KEY,
+      defaultHeaders: {
+        "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+      },
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Anthropic">
+    ```typescript
+    import Anthropic from "@anthropic-ai/sdk";
+
+    const client = new Anthropic({
+      baseURL: "https://anthropic.helicone.ai",
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      defaultHeaders: {
+        "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+      },
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    from openai import OpenAI
+
+    client = OpenAI(
+        base_url="https://oai.helicone.ai/v1",
+        api_key=os.getenv("OPENAI_API_KEY"),
+        default_headers={
+            "Helicone-Auth": f"Bearer {os.getenv('HELICONE_API_KEY')}"
+        }
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## Custom Headers
+
+Add Helicone headers to any request for tracking and custom properties:
+
+```typescript
+const response = await client.chat.completions.create(
+  {
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Hello!" }],
+  },
+  {
+    headers: {
+      "Helicone-Session-Id": "session-123",
+      "Helicone-User-Id": "user-456",
+      "Helicone-Property-Environment": "production",
+    },
+  }
+);
+```
+
+### Available Headers
+
+- `Helicone-Auth`: Your API key (format: `Bearer sk-helicone-xxx`)
+- `Helicone-Session-Id`: Track requests across a session
+- `Helicone-User-Id`: Associate requests with a user
+- `Helicone-Property-*`: Add custom properties (replace `*` with property name)
+- `Helicone-Prompt-Id`: Track prompt versions
+- `Helicone-Cache-Enabled`: Enable response caching
+
+## Quick Start by Use Case
+
+<AccordionGroup>
+  <Accordion title="I want the lowest latency">
+    Use async logging with `@helicone/async` to eliminate proxy latency:
+    
+    ```typescript
+    import { HeliconeAsyncLogger } from "@helicone/async";
+    import OpenAI from "openai";
+
+    const logger = new HeliconeAsyncLogger({
+      apiKey: process.env.HELICONE_API_KEY,
+      providers: { openAI: OpenAI },
+    });
+    logger.init();
+
+    const client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+    ```
+    
+    See [Async Logging](/integrations/async-logging) for details.
+  </Accordion>
+  
+  <Accordion title="I want to use multiple providers">
+    Use the AI Gateway for unified access:
+    
+    ```typescript
+    const client = new OpenAI({
+      baseURL: "https://ai-gateway.helicone.ai",
+      apiKey: process.env.HELICONE_API_KEY,
+    });
+
+    // Use any model from any provider
+    await client.chat.completions.create({
+      model: "claude-3-5-sonnet-20240620/anthropic",
+      messages: [{ role: "user", content: "Hello!" }],
+    });
+    ```
+    
+    See [AI Gateway](/gateway/overview) for details.
+  </Accordion>
+  
+  <Accordion title="I'm using LangChain">
+    Route LangChain requests through Helicone:
+    
+    ```typescript
+    import { ChatOpenAI } from "@langchain/openai";
+
+    const model = new ChatOpenAI({
+      modelName: "gpt-4o-mini",
+      configuration: {
+        baseURL: "https://oai.helicone.ai/v1",
+        defaultHeaders: {
+          "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+        },
+      },
+    });
+    ```
+    
+    See [LangChain Integration](/integrations/langchain) for details.
+  </Accordion>
+  
+  <Accordion title="I'm using Vercel AI SDK">
+    Configure the provider with Helicone:
+    
+    ```typescript
+    import { createOpenAI } from "@ai-sdk/openai";
+
+    const openai = createOpenAI({
+      baseURL: "https://oai.helicone.ai/v1",
+      headers: {
+        "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+      },
+    });
+    ```
+    
+    See [Vercel AI SDK Integration](/integrations/vercel-ai-sdk) for details.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="OpenAI Integration" icon="brain" href="/integrations/openai">
+    Complete guide for OpenAI integration
+  </Card>
+  <Card title="Anthropic Integration" icon="message" href="/integrations/anthropic">
+    Complete guide for Anthropic integration
+  </Card>
+  <Card title="AI Gateway" icon="network-wired" href="/gateway/overview">
+    Learn about the AI Gateway
+  </Card>
+  <Card title="Custom Properties" icon="tag" href="/features/custom-properties">
+    Track custom metadata
+  </Card>
+</CardGroup>

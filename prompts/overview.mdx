@@ -1,0 +1,162 @@
+---
+title: "Prompt Management Overview"
+description: "Version, deploy, and manage AI prompts without code changes using Helicone's prompt management system"
+icon: "file-code"
+---
+
+Helicone's prompt management system lets you version, deploy, and iterate on prompts without changing your code. Create prompts in the UI, deploy them to different environments, and track how they perform in production.
+
+## Why Use Prompt Management?
+
+<CardGroup cols={2}>
+  <Card title="Version Control" icon="code-branch">
+    Track every prompt change with major and minor versions. Rollback to previous versions when needed.
+  </Card>
+  <Card title="Environment Deployment" icon="rocket">
+    Deploy different prompt versions to production, staging, or custom environments.
+  </Card>
+  <Card title="No Code Changes" icon="code">
+    Update prompts without redeploying your application. Change text, parameters, and tools on the fly.
+  </Card>
+  <Card title="A/B Testing" icon="flask">
+    Run experiments to compare prompt variations and measure performance improvements.
+  </Card>
+</CardGroup>
+
+## How It Works
+
+Prompt management in Helicone follows a simple workflow:
+
+<Steps>
+  <Step title="Create a prompt in the UI">
+    Build your prompt template in the Helicone dashboard with variables, messages, tools, and parameters.
+  </Step>
+  
+  <Step title="Deploy using the SDK">
+    Reference your prompt by ID in your code using the `@helicone/prompts` SDK.
+  </Step>
+  
+  <Step title="Update without redeploying">
+    Make changes in the UI and deploy new versions to different environments instantly.
+  </Step>
+</Steps>
+
+## Core Concepts
+
+### Prompts
+
+A prompt is a template that defines:
+- **Messages**: The conversation structure (system, user, assistant messages)
+- **Variables**: Placeholders like `{{hc:name:string}}` that get replaced at runtime
+- **Model Parameters**: Temperature, max tokens, top_p, etc.
+- **Tools**: Function calling definitions
+- **Response Format**: Structured output schemas
+
+### Versions
+
+Every prompt has multiple versions with semantic versioning:
+- **Major versions** (1.0, 2.0): Breaking changes or significant rewrites
+- **Minor versions** (1.1, 1.2): Incremental improvements
+
+Each version is immutable and stored with a commit message for tracking.
+
+### Environments
+
+Deploy specific versions to named environments:
+- `production`: The live version users interact with
+- `staging`: Testing before production release
+- Custom environments: `dev`, `qa`, `canary`, etc.
+
+One version can be deployed to multiple environments simultaneously.
+
+### Variables
+
+Prompts support typed variables using the syntax `{{hc:variableName:type}}`:
+
+```
+{{hc:userName:string}}
+{{hc:temperature:number}}
+{{hc:enableFeature:boolean}}
+```
+
+Variables are validated at runtime and can appear in:
+- Message content
+- Tool descriptions
+- Response format schemas
+
+## Quick Start
+
+<Steps>
+  <Step title="Install the SDK">
+    ```bash
+    npm install @helicone/prompts
+    ```
+  </Step>
+  
+  <Step title="Create a prompt in the UI">
+    Navigate to **Prompts** in your Helicone dashboard and create a new prompt. Add messages, variables, and parameters.
+  </Step>
+  
+  <Step title="Use in your code">
+    ```typescript
+    import { HeliconePromptManager } from "@helicone/prompts";
+    import { OpenAI } from "openai";
+
+    const promptManager = new HeliconePromptManager({
+      apiKey: process.env.HELICONE_API_KEY!,
+    });
+
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY!,
+    });
+
+    // Fetch and compile the production version
+    const { body } = await promptManager.getPromptBody({
+      prompt_id: "abc123",
+      environment: "production",
+      inputs: {
+        userName: "Alice",
+        topic: "AI safety",
+      },
+    });
+
+    // Use with any OpenAI-compatible API
+    const response = await openai.chat.completions.create(body);
+    ```
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Versioning" icon="code-branch" href="/prompts/versioning">
+    Learn how to create and manage prompt versions
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/prompts/deployment">
+    Deploy prompts to different environments
+  </Card>
+  <Card title="Experiments" icon="flask" href="/prompts/experiments">
+    Run A/B tests to compare prompt variations
+  </Card>
+  <Card title="Gateway Integration" icon="network-wired" href="/gateway/overview">
+    Use prompts directly through the AI Gateway
+  </Card>
+</CardGroup>
+
+## Benefits
+
+### Faster Iteration
+
+Change prompts instantly without code deployments. Test new approaches in production with confidence.
+
+### Audit Trail
+
+Every change is tracked with versions and commit messages. Know exactly what changed and when.
+
+### Collaboration
+
+Non-technical team members can iterate on prompts in the UI while engineers focus on application logic.
+
+### Safety
+
+Rollback to previous versions if new prompts underperform. Deploy cautiously to staging before production.

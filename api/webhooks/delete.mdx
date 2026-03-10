@@ -1,0 +1,66 @@
+---
+title: "Delete Webhook"
+sidebarTitle: "Delete Webhook"
+description: "Delete an existing webhook configuration"
+openapi: delete /v1/webhooks/{webhookId}
+---
+
+This endpoint permanently deletes a webhook configuration. The webhook will immediately stop receiving events.
+
+## Use Cases
+
+- Remove outdated webhook configurations
+- Clean up test webhooks
+- Disable integrations
+- Rotate webhook endpoints
+
+## Path Parameters
+
+<ParamField path="webhookId" type="string" required>
+  The unique identifier of the webhook to delete. This is the `id` field returned from the list webhooks endpoint.
+</ParamField>
+
+## Response
+
+Returns a Result object indicating success or failure.
+
+<ResponseField name="data" type="null">
+  Null on success
+</ResponseField>
+
+<ResponseField name="error" type="string | null">
+  Error message if the request failed, null on success
+</ResponseField>
+
+## Example Request
+
+```bash
+curl --request DELETE \
+  --url https://api.helicone.ai/v1/webhooks/550e8400-e29b-41d4-a716-446655440000 \
+  --header 'Authorization: Bearer <YOUR_API_KEY>'
+```
+
+## Example Response
+
+```json
+{
+  "data": null,
+  "error": null
+}
+```
+
+## Error Response
+
+```json
+{
+  "data": null,
+  "error": "Webhook not found"
+}
+```
+
+## Notes
+
+- Deletion is permanent and cannot be undone
+- The webhook will immediately stop receiving events
+- You can only delete webhooks that belong to your organization
+- Any in-flight webhook requests may still be delivered

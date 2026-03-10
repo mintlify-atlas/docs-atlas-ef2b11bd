@@ -1,0 +1,612 @@
+---
+title: "Custom Properties"
+sidebarTitle: "Custom Properties"
+description: "Tag LLM requests with custom metadata using headers to enable powerful filtering, segmentation, and cost analysis by any dimension"
+"twitter:title": "Custom Properties - Helicone OSS LLM Observability"
+---
+
+import QuestionsSection from "/snippets/questions-section.mdx";
+
+Custom Properties let you attach metadata to every LLM request using simple HTTP headers. This metadata becomes queryable in the dashboard and API, enabling you to filter, segment, and analyze your data by any dimension that matters to your business.
+
+<Frame caption="Custom properties appear as filterable columns in the Requests table">
+  <img
+    src="/images/example-custom-properties.png"
+    alt="Helicone dashboard showing custom properties for filtering requests"
+  />
+</Frame>
+
+## Why Use Custom Properties
+
+**Without custom properties:**
+- ❌ Can't segment costs by feature, environment, or user type
+- ❌ Hard to trace which requests belong to specific workflows
+- ❌ No way to filter requests by your business dimensions
+- ❌ Limited debugging context for production issues
+
+**With custom properties:**
+- ✅ Filter requests by environment, feature, version, or any custom dimension
+- ✅ Calculate cost per user, feature, or workflow
+- ✅ Debug issues by filtering on relevant metadata
+- ✅ Analyze performance across different segments
+- ✅ Track business metrics alongside technical metrics
+
+## Quick Start
+
+Add custom properties using HTTP headers with the format `Helicone-Property-[Name]`:
+
+<CodeGroup>
+```typescript TypeScript
+import { OpenAI } from "openai";
+
+const client = new OpenAI({
+  baseURL: "https://ai-gateway.helicone.ai",
+  apiKey: process.env.HELICONE_API_KEY,
+});
+
+const response = await client.chat.completions.create(
+  {
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Hello!" }]
+  },
+  {
+    headers: {
+      "Helicone-Property-Environment": "production",
+      "Helicone-Property-Feature": "chat",
+      "Helicone-Property-Version": "v2.1.0",
+      "Helicone-User-Id": "user-123"
+    }
+  }
+);
+```
+
+```python Python
+from openai import OpenAI
+import os
+
+client = OpenAI(
+    base_url="https://ai-gateway.helicone.ai",
+    api_key=os.environ.get("HELICONE_API_KEY"),
+)
+
+response = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[{"role": "user", "content": "Hello!"}],
+    extra_headers={
+        "Helicone-Property-Environment": "production",
+        "Helicone-Property-Feature": "chat",
+        "Helicone-Property-Version": "v2.1.0",
+        "Helicone-User-Id": "user-123"
+    }
+)
+```
+
+```bash cURL
+curl https://ai-gateway.helicone.ai/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $HELICONE_API_KEY" \
+  -H "Helicone-Property-Environment: production" \
+  -H "Helicone-Property-Feature: chat" \
+  -H "Helicone-Property-Version: v2.1.0" \
+  -H "Helicone-User-Id: user-123" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+```
+</CodeGroup>
+
+## Common Property Patterns
+
+### Environment & Deployment
+
+Track which environment requests come from:
+
+```typescript
+const headers = {
+  "Helicone-Property-Environment": process.env.NODE_ENV,    // "production", "staging", "development"
+  "Helicone-Property-Version": packageJson.version,         // "v2.1.0"
+  "Helicone-Property-Region": process.env.AWS_REGION,       // "us-east-1"
+  "Helicone-Property-DeploymentId": process.env.DEPLOY_ID   // "deploy-abc123"
+};
+```
+
+**Use cases:**
+- Compare costs across environments
+- Debug production-specific issues
+- Track performance by region
+- Analyze usage by deployment version
+
+### Feature & Workflow
+
+Identify which feature or workflow made the request:
+
+```typescript
+const headers = {
+  "Helicone-Property-Feature": "chat",              // "chat", "summarize", "translate"
+  "Helicone-Property-Workflow": "customer-support", // "customer-support", "content-gen"
+  "Helicone-Property-Component": "message-handler", // "message-handler", "analyzer"
+  "Helicone-Property-RequestType": "user-query"     // "user-query", "system-task"
+};
+```
+
+**Use cases:**
+- Calculate cost per feature
+- Optimize expensive workflows
+- Track feature adoption
+- Debug specific workflow failures
+
+### User Segmentation
+
+Segment by user characteristics:
+
+```typescript
+const headers = {
+  "Helicone-User-Id": userId,                        // "user-123"
+  "Helicone-Property-UserTier": userTier,            // "free", "pro", "enterprise"
+  "Helicone-Property-UserType": userType,            // "individual", "business"
+  "Helicone-Property-Organization": orgId,           // "org-456"
+  "Helicone-Property-SignupDate": user.signupDate    // "2024-01-15"
+};
+```
+
+**Use cases:**
+- Calculate cost per user tier
+- Analyze usage by organization
+- Track power users
+- Measure cohort retention
+
+### Business Context
+
+Add business-specific metadata:
+
+```typescript
+const headers = {
+  "Helicone-Property-Industry": "healthcare",       // "healthcare", "finance", "retail"
+  "Helicone-Property-UseCase": "medical-coding",    // Your specific use case
+  "Helicone-Property-Priority": "high",             // "low", "medium", "high"
+  "Helicone-Property-SLA": "tier1",                // SLA tier for the request
+  "Helicone-Property-Campaign": "spring-promo"      // Marketing campaign
+};
+```
+
+**Use cases:**
+- Calculate ROI by use case
+- Prioritize high-value requests
+- Track campaign effectiveness
+- Ensure SLA compliance
+
+## Filtering by Properties
+
+### Dashboard Filters
+
+In the Helicone dashboard:
+
+1. Go to the **Requests** page
+2. Click **Add Filter**
+3. Select **Custom Property**
+4. Choose your property name and value
+5. Click **Apply**
+
+You can combine multiple property filters to narrow down results.
+
+### API Filtering
+
+<Warning>
+**Critical:** When filtering by custom properties via API, you MUST wrap the `properties` filter inside a `request_response_rmt` object. Omitting this wrapper returns empty results.
+</Warning>
+
+**Single property filter:**
+
+```bash
+curl --request POST \
+  --url https://api.helicone.ai/v1/request/query-clickhouse \
+  --header "Content-Type: application/json" \
+  --header "Authorization: Bearer $HELICONE_API_KEY" \
+  --data '{
+  "filter": {
+    "request_response_rmt": {
+      "properties": {
+        "Environment": {
+          "equals": "production"
+        }
+      }
+    }
+  },
+  "limit": 100
+}'
+```
+
+**Multiple property filters:**
+
+```bash
+curl --request POST \
+  --url https://api.helicone.ai/v1/request/query-clickhouse \
+  --header "Content-Type: application/json" \
+  --header "Authorization: Bearer $HELICONE_API_KEY" \
+  --data '{
+  "filter": {
+    "left": {
+      "request_response_rmt": {
+        "properties": {
+          "Environment": {
+            "equals": "production"
+          }
+        }
+      }
+    },
+    "operator": "and",
+    "right": {
+      "request_response_rmt": {
+        "properties": {
+          "Feature": {
+            "equals": "chat"
+          }
+        }
+      }
+    }
+  },
+  "limit": 100
+}'
+```
+
+**Combining properties with other filters:**
+
+```bash
+curl --request POST \
+  --url https://api.helicone.ai/v1/request/query-clickhouse \
+  --header "Content-Type: application/json" \
+  --header "Authorization: Bearer $HELICONE_API_KEY" \
+  --data '{
+  "filter": {
+    "left": {
+      "request_response_rmt": {
+        "model": {
+          "equals": "gpt-4o-mini"
+        }
+      }
+    },
+    "operator": "and",
+    "right": {
+      "request_response_rmt": {
+        "properties": {
+          "Environment": {
+            "equals": "production"
+          }
+        }
+      }
+    }
+  },
+  "limit": 100
+}'
+```
+
+## Cost Analysis by Property
+
+Calculate costs segmented by any custom property:
+
+### Cost per Feature
+
+```typescript
+// Tag all requests by feature
+const headers = {
+  "Helicone-Property-Feature": featureName
+};
+
+// Query via API and sum costs
+const features = ["chat", "summarize", "translate", "analyze"];
+
+for (const feature of features) {
+  const response = await fetch('https://api.helicone.ai/v1/request/query-clickhouse', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${HELICONE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      filter: {
+        request_response_rmt: {
+          properties: {
+            Feature: { equals: feature }
+          }
+        }
+      }
+    })
+  });
+  
+  const { data } = await response.json();
+  const totalCost = data.reduce((sum, req) => sum + req.cost, 0);
+  
+  console.log(`${feature}: $${totalCost.toFixed(2)}`);
+}
+```
+
+### Cost per User Tier
+
+```typescript
+// Tag requests by user tier
+const headers = {
+  "Helicone-Property-UserTier": userTier  // "free", "pro", "enterprise"
+};
+
+// Calculate average cost per tier
+const tiers = ["free", "pro", "enterprise"];
+
+for (const tier of tiers) {
+  // Query requests for this tier
+  // Calculate: total cost / unique users
+}
+```
+
+### Cost per Environment
+
+```typescript
+// Compare production vs staging costs
+const environments = ["production", "staging", "development"];
+
+for (const env of environments) {
+  // Query and sum costs by environment
+}
+```
+
+## Updating Properties After Request
+
+You can add or update properties after a request is made:
+
+```typescript
+// Make the request
+const { data, response } = await client.chat.completions
+  .create({ /* request */ })
+  .withResponse();
+
+// Get the request ID from response headers
+const requestId = response.headers.get("helicone-id");
+
+// Update properties via API
+await fetch(`https://api.helicone.ai/v1/request/${requestId}/property`, {
+  method: "PUT",
+  headers: {
+    "Authorization": `Bearer ${HELICONE_API_KEY}`,
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    "ResultCategory": "success",
+    "ProcessingTime": "1234",
+    "QualityScore": "8.5"
+  })
+});
+```
+
+**Use cases:**
+- Add properties based on response content
+- Update properties after post-processing
+- Tag requests with business outcome
+- Add quality scores or ratings
+
+## Property Naming Conventions
+
+### Best Practices
+
+✅ **Do:**
+- Use PascalCase for property names: `UserTier`, `FeatureName`
+- Keep names concise but descriptive
+- Use consistent naming across your app
+- Document your property schema
+
+❌ **Don't:**
+- Use spaces or special characters
+- Include PII (personally identifiable information)
+- Use overly generic names like `Type` or `Status`
+- Change property names frequently
+
+### Example Schema
+
+Document your properties for team consistency:
+
+```typescript
+// properties-schema.ts
+export const PropertySchema = {
+  // Environment
+  Environment: ["production", "staging", "development"],
+  Version: "semver string (e.g., v2.1.0)",
+  Region: ["us-east-1", "eu-west-1", "ap-southeast-1"],
+  
+  // Feature
+  Feature: ["chat", "summarize", "translate", "analyze"],
+  Workflow: ["customer-support", "content-generation", "research"],
+  Component: "string (e.g., message-handler)",
+  
+  // User
+  UserTier: ["free", "pro", "enterprise"],
+  UserType: ["individual", "business"],
+  Organization: "org-{id}",
+  
+  // Business
+  Priority: ["low", "medium", "high"],
+  Industry: ["healthcare", "finance", "retail"],
+  Campaign: "string (e.g., spring-promo)"
+};
+```
+
+## Performance Considerations
+
+### Property Limits
+
+- **No hard limit** on number of properties per request
+- Keep property values under 1000 characters
+- Avoid overly complex or deeply nested values
+
+### Query Performance
+
+Properties are indexed for fast querying:
+- Filtering by properties is performant
+- Use specific property values over wildcards
+- Combine filters efficiently (AND/OR logic)
+
+## Combining with Other Features
+
+### Properties + Sessions
+
+Add properties to session requests:
+
+```typescript
+const sessionId = randomUUID();
+
+await client.chat.completions.create(
+  { /* request */ },
+  {
+    headers: {
+      // Session headers
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Path": "/workflow/step",
+      "Helicone-Session-Name": "Research Agent",
+      
+      // Custom properties
+      "Helicone-Property-Environment": "production",
+      "Helicone-Property-Topic": "quantum-computing",
+      "Helicone-Property-Priority": "high"
+    }
+  }
+);
+```
+
+Now you can:
+- Filter sessions by properties
+- Analyze session costs by property
+- Debug sessions matching specific criteria
+
+### Properties + Traces
+
+Add properties to custom traces:
+
+```typescript
+import { HeliconeManualLogger } from "@helicone/helpers";
+
+const logger = new HeliconeManualLogger({
+  apiKey: process.env.HELICONE_API_KEY
+});
+
+await logger.logRequest(
+  { /* trace data */ },
+  async (resultRecorder) => {
+    // Perform operation
+    const result = await performOperation();
+    resultRecorder.appendResults(result);
+    return result;
+  },
+  {
+    "Helicone-Property-Operation": "database_query",
+    "Helicone-Property-Table": "users",
+    "Helicone-Property-Environment": "production"
+  }
+);
+```
+
+## Use Case Examples
+
+### Multi-tenant SaaS
+
+```typescript
+// Track costs per organization
+const headers = {
+  "Helicone-Property-Organization": orgId,
+  "Helicone-Property-Workspace": workspaceId,
+  "Helicone-User-Id": userId,
+  "Helicone-Property-PlanType": "enterprise"
+};
+
+// Calculate:
+// - Cost per organization
+// - Usage by workspace
+// - Per-user costs within org
+```
+
+### A/B Testing
+
+```typescript
+// Track experiment variants
+const variant = getUserExperiment(userId, "new-prompt");
+
+const headers = {
+  "Helicone-Property-Experiment": "new-prompt",
+  "Helicone-Property-Variant": variant,  // "control" or "treatment"
+  "Helicone-User-Id": userId
+};
+
+// Analyze:
+// - Cost difference between variants
+// - Performance metrics by variant
+// - User satisfaction by variant
+```
+
+### Content Moderation
+
+```typescript
+// Track moderation requests
+const headers = {
+  "Helicone-Property-ContentType": "user-message",
+  "Helicone-Property-ModerationLevel": "strict",
+  "Helicone-Property-Category": contentCategory,
+  "Helicone-User-Id": userId
+};
+
+// Later, add result
+await updateRequestProperty(requestId, {
+  "ModerationResult": "flagged",
+  "FlagReason": "inappropriate-content"
+});
+```
+
+## Troubleshooting
+
+### Properties Not Appearing
+
+**Problem**: Properties aren't showing up in the dashboard.
+
+**Solutions**:
+- Verify header format: `Helicone-Property-[Name]`
+- Check that property name doesn't contain spaces
+- Ensure value is a string (not an object or array)
+- Wait a few seconds for data to propagate
+
+### Can't Filter by Property
+
+**Problem**: Filtering by property returns no results.
+
+**Solutions**:
+- In API, wrap properties in `request_response_rmt` object
+- Check property name matches exactly (case-sensitive)
+- Verify the property exists on your requests
+- Use `equals` operator for exact matches
+
+### Query Returns Empty Results
+
+**Problem**: API query returns `{"data":[], "error":null}`.
+
+**Solutions**:
+- Ensure `request_response_rmt` wrapper is present
+- Check that property value matches exactly
+- Verify date range includes requests with this property
+- Try querying without property filter first to verify data exists
+
+## Related Features
+
+<CardGroup cols={2}>
+<Card title="Requests" icon="file-lines" href="/observability/requests">
+View and filter requests by custom properties
+</Card>
+
+<Card title="Sessions" icon="diagram-project" href="/observability/sessions">
+Combine properties with session tracking
+</Card>
+
+<Card title="User Metrics" icon="users" href="/features/advanced-usage/user-metrics">
+Analyze per-user metrics with Helicone-User-Id
+</Card>
+
+<Card title="Query API" icon="code" href="/rest/request/post-v1requestquery-clickhouse">
+Query requests by properties programmatically
+</Card>
+</CardGroup>
+
+<QuestionsSection />

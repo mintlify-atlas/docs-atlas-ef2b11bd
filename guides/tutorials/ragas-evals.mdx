@@ -1,0 +1,554 @@
+---
+title: "LLM Evaluation with RAGAS"
+description: "Implement comprehensive evaluation pipelines using RAGAS metrics and Helicone for systematic quality assessment"
+sidebarTitle: "RAGAS Evaluations"
+---
+
+Evaluating LLM outputs is critical for maintaining quality in production. This tutorial shows you how to build a complete evaluation pipeline using [RAGAS](https://docs.ragas.io/) metrics and Helicone's dataset features.
+
+## What is RAGAS?
+
+RAGAS (Retrieval Augmented Generation Assessment) provides metrics for evaluating:
+- **Answer correctness** - How accurate is the response?
+- **Answer similarity** - How close to the reference answer?
+- **Faithfulness** - Is the answer grounded in the context?
+- **Context relevance** - Is retrieved context useful?
+
+## Prerequisites
+
+- Python 3.8+
+- Helicone account with API key
+- Requests logged in Helicone (see [Quick Start](/getting-started/quick-start))
+
+## Setup
+
+<Steps>
+  <Step title="Install Dependencies">
+    ```bash
+    pip install ragas pandas datasets python-dotenv requests
+    ```
+  </Step>
+
+  <Step title="Configure Environment">
+    Create a `.env` file:
+
+    ```bash
+    HELICONE_API_KEY=sk-your-helicone-key
+    OPENAI_API_KEY=sk-your-openai-key
+    ```
+
+    RAGAS uses OpenAI models for evaluation by default.
+  </Step>
+</Steps>
+
+## Workflow Overview
+
+<Frame caption="Complete RAGAS evaluation workflow">
+  <img
+    src="/images/sessions/session-metrics.webp"
+    alt="Evaluation workflow diagram"
+  />
+</Frame>
+
+## Step 1: Export Data from Helicone
+
+### Create a Dataset
+
+In your Helicone dashboard:
+
+1. Navigate to **Datasets** → **Create Dataset**
+2. Filter requests you want to evaluate (e.g., production traffic from last week)
+3. Add requests to the dataset
+4. Click **"Export Data"** to download CSV
+
+The exported CSV contains:
+- `id` - Request ID
+- `model` - Model used
+- `messages` - Input prompt
+- `choices` - Model response
+- `heliconeMetadata` - Custom properties and metadata
+
+### Export via API
+
+Alternatively, export programmatically:
+
+```python
+import requests
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+def export_helicone_data(filter_params):
+    """Export requests from Helicone API"""
+    response = requests.post(
+        "https://api.helicone.ai/v1/request/query",
+        headers={
+            "Authorization": f"Bearer {os.getenv('HELICONE_API_KEY')}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "filter": filter_params,
+            "limit": 1000
+        }
+    )
+    
+    if response.status_code == 200:
+        return response.json()["data"]
+    else:
+        raise Exception(f"Failed to export data: {response.text}")
+
+# Example: Export last week's production traffic
+from datetime import datetime, timedelta
+
+filter_params = {
+    "properties": {
+        "Environment": "production"
+    },
+    "request_created_at": {
+        "gte": (datetime.now() - timedelta(days=7)).isoformat()
+    }
+}
+
+data = export_helicone_data(filter_params)
+print(f"Exported {len(data)} requests")
+```
+
+## Step 2: Add Ground Truth Labels
+
+RAGAS evaluation requires reference answers ("ground truth") to compare against.
+
+### Manual Labeling
+
+Create a script to help with manual annotation:
+
+```python
+import pandas as pd
+import json
+
+def add_ground_truth_column(input_csv, output_csv):
+    """Add ground truth column to exported CSV"""
+    df = pd.read_csv(input_csv)
+    
+    # Extract model responses as starting point
+    gold_answers = []
+    for _, row in df.iterrows():
+        try:
+            choices = json.loads(row["choices"])
+            assistant_text = choices[0]["message"]["content"]
+            gold_answers.append(assistant_text)
+        except:
+            gold_answers.append("")
+    
+    df["ground_truth"] = gold_answers
+    df.to_csv(output_csv, index=False)
+    
+    print(f"Created {output_csv} with ground_truth column")
+    print("Now manually edit the ground_truth values to be correct answers")
+
+# Usage
+add_ground_truth_column("helicone_export.csv", "data_for_labeling.csv")
+```
+
+Then manually edit `ground_truth` column with correct answers.
+
+### Automated Labeling
+
+For testing, generate synthetic labels:
+
+```python
+import openai
+
+def generate_ground_truth(question: str, context: str = None) -> str:
+    """Generate reference answer using GPT-4"""
+    client = openai.OpenAI()
+    
+    prompt = f"""Provide a concise, accurate answer to this question.
+    
+Question: {question}
+"""
+    
+    if context:
+        prompt += f"\nContext: {context}"
+    
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0
+    )
+    
+    return response.choices[0].message.content
+
+# Add to DataFrame
+df["ground_truth"] = df["messages"].apply(
+    lambda x: generate_ground_truth(x)
+)
+```
+
+<Warning>
+  Synthetic ground truth is useful for testing but not for production evaluation. Use human-labeled data for reliable quality assessment.
+</Warning>
+
+## Step 3: Prepare Evaluation Dataset
+
+Convert Helicone export to RAGAS format:
+
+```python
+import pandas as pd
+import json
+from datasets import Dataset
+
+def prepare_ragas_dataset(csv_path: str) -> Dataset:
+    """Convert Helicone CSV to RAGAS dataset format"""
+    df = pd.read_csv(csv_path)
+    
+    eval_data = {
+        'question': [],
+        'answer': [],
+        'ground_truth': [],
+        'contexts': [],  # Optional: for RAG evaluation
+        'request_id': [],  # To link back to Helicone
+    }
+    
+    for _, row in df.iterrows():
+        # Extract user question
+        try:
+            messages = json.loads(row['messages']) if isinstance(row['messages'], str) else row['messages']
+            question = next(
+                (m['content'] for m in messages if m['role'] == 'user'),
+                ""
+            )
+        except:
+            continue
+        
+        # Extract model answer
+        try:
+            choices = json.loads(row['choices'])
+            answer = choices[0]['message']['content']
+        except:
+            continue
+        
+        # Check for ground truth
+        if 'ground_truth' not in df.columns or pd.isna(row['ground_truth']):
+            print(f"Warning: Missing ground truth for request {row['id']}")
+            continue
+        
+        eval_data['question'].append(question)
+        eval_data['answer'].append(answer)
+        eval_data['ground_truth'].append(row['ground_truth'])
+        eval_data['contexts'].append([])  # Add if using RAG
+        eval_data['request_id'].append(row['id'])
+    
+    return Dataset.from_dict(eval_data)
+
+# Load and prepare dataset
+dataset = prepare_ragas_dataset('data_with_ground_truth.csv')
+print(f"Prepared {len(dataset)} examples for evaluation")
+```
+
+## Step 4: Run RAGAS Evaluation
+
+Evaluate responses using RAGAS metrics:
+
+```python
+from ragas import evaluate
+from ragas.metrics import (
+    answer_correctness,
+    answer_similarity,
+    answer_relevancy,
+    faithfulness,
+)
+from dotenv import load_dotenv
+
+load_dotenv()
+
+def run_evaluation(dataset: Dataset):
+    """Run RAGAS evaluation on prepared dataset"""
+    
+    # Select metrics
+    metrics = [
+        answer_correctness,  # 0-1: How correct is the answer?
+        answer_similarity,   # 0-1: How similar to ground truth?
+        answer_relevancy,    # 0-1: Is answer relevant to question?
+    ]
+    
+    # Run evaluation
+    print("Starting RAGAS evaluation...")
+    results = evaluate(
+        dataset=dataset,
+        metrics=metrics,
+        llm=None,  # Uses OpenAI by default
+    )
+    
+    return results
+
+# Run evaluation
+results = run_evaluation(dataset)
+
+# View results
+results_df = results.to_pandas()
+print("\n=== Evaluation Results ===")
+print(f"Average Correctness: {results_df['answer_correctness'].mean():.3f}")
+print(f"Average Similarity: {results_df['answer_similarity'].mean():.3f}")
+print(f"Average Relevancy: {results_df['answer_relevancy'].mean():.3f}")
+
+# Save results
+results_df.to_csv('evaluation_results.csv', index=False)
+```
+
+## Step 5: Push Scores to Helicone
+
+Sync evaluation scores back to Helicone for unified tracking:
+
+```python
+import requests
+import os
+from typing import Dict
+
+def post_scores_to_helicone(request_id: str, scores: Dict[str, float]):
+    """Post evaluation scores to Helicone for a request"""
+    url = f"https://api.helicone.ai/v1/request/{request_id}/score"
+    
+    response = requests.post(
+        url,
+        headers={
+            "Authorization": f"Bearer {os.getenv('HELICONE_API_KEY')}",
+            "Content-Type": "application/json"
+        },
+        json={"scores": scores}
+    )
+    
+    if response.ok:
+        return True
+    else:
+        print(f"Failed to post score for {request_id}: {response.text}")
+        return False
+
+def sync_ragas_scores(results_df: pd.DataFrame):
+    """Sync all RAGAS scores back to Helicone"""
+    success_count = 0
+    
+    for _, row in results_df.iterrows():
+        request_id = row['request_id']
+        
+        scores = {
+            'ragas_correctness': float(row['answer_correctness']),
+            'ragas_similarity': float(row['answer_similarity']),
+            'ragas_relevancy': float(row['answer_relevancy']),
+        }
+        
+        if post_scores_to_helicone(request_id, scores):
+            success_count += 1
+    
+    print(f"Successfully synced {success_count}/{len(results_df)} scores")
+
+# Sync scores
+sync_ragas_scores(results_df)
+```
+
+Now you can filter and analyze requests by RAGAS scores in your Helicone dashboard!
+
+## Step 6: Analyze Results
+
+Identify patterns in low-scoring responses:
+
+```python
+def analyze_poor_performance(results_df: pd.DataFrame, threshold: float = 0.7):
+    """Find requests with low scores for investigation"""
+    
+    # Find low-scoring responses
+    poor_correctness = results_df[results_df['answer_correctness'] < threshold]
+    poor_similarity = results_df[results_df['answer_similarity'] < threshold]
+    
+    print(f"\n=== Low Correctness ({len(poor_correctness)} requests) ===")
+    for _, row in poor_correctness.head(5).iterrows():
+        print(f"\nQuestion: {row['question'][:100]}...")
+        print(f"Score: {row['answer_correctness']:.3f}")
+        print(f"Request ID: {row['request_id']}")
+    
+    print(f"\n=== Low Similarity ({len(poor_similarity)} requests) ===")
+    for _, row in poor_similarity.head(5).iterrows():
+        print(f"\nQuestion: {row['question'][:100]}...")
+        print(f"Score: {row['answer_similarity']:.3f}")
+        print(f"Request ID: {row['request_id']}")
+    
+    return poor_correctness, poor_similarity
+
+# Analyze
+poor_correctness, poor_similarity = analyze_poor_performance(results_df)
+```
+
+## Complete Evaluation Pipeline
+
+Put everything together:
+
+```python
+#!/usr/bin/env python3
+"""
+Complete RAGAS evaluation pipeline for Helicone data
+
+Usage:
+    python evaluate.py --input helicone_export.csv --output results.csv
+"""
+
+import argparse
+import pandas as pd
+from datasets import Dataset
+from ragas import evaluate
+from ragas.metrics import answer_correctness, answer_similarity
+import requests
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input', required=True, help='Input CSV from Helicone')
+    parser.add_argument('--output', required=True, help='Output CSV with scores')
+    parser.add_argument('--threshold', type=float, default=0.7, 
+                       help='Score threshold for flagging')
+    parser.add_argument('--sync', action='store_true',
+                       help='Sync scores back to Helicone')
+    args = parser.parse_args()
+    
+    # Step 1: Prepare dataset
+    print(f"Loading data from {args.input}...")
+    dataset = prepare_ragas_dataset(args.input)
+    print(f"Prepared {len(dataset)} examples")
+    
+    # Step 2: Run evaluation
+    print("Running RAGAS evaluation...")
+    results = evaluate(
+        dataset=dataset,
+        metrics=[answer_correctness, answer_similarity]
+    )
+    
+    # Step 3: Save results
+    results_df = results.to_pandas()
+    results_df.to_csv(args.output, index=False)
+    print(f"Saved results to {args.output}")
+    
+    # Step 4: Analyze
+    print("\n=== Summary ===")
+    print(f"Average Correctness: {results_df['answer_correctness'].mean():.3f}")
+    print(f"Average Similarity: {results_df['answer_similarity'].mean():.3f}")
+    
+    low_score_count = len(results_df[
+        (results_df['answer_correctness'] < args.threshold) |
+        (results_df['answer_similarity'] < args.threshold)
+    ])
+    print(f"Requests below threshold: {low_score_count}")
+    
+    # Step 5: Optionally sync to Helicone
+    if args.sync:
+        print("\nSyncing scores to Helicone...")
+        sync_ragas_scores(results_df)
+
+if __name__ == '__main__':
+    main()
+```
+
+Run it:
+
+```bash
+python evaluate.py \
+  --input helicone_export.csv \
+  --output evaluation_results.csv \
+  --threshold 0.7 \
+  --sync
+```
+
+## Automated Evaluation
+
+Run evaluations on a schedule:
+
+```python
+import schedule
+import time
+from datetime import datetime, timedelta
+
+def daily_evaluation():
+    """Run evaluation on yesterday's production traffic"""
+    
+    # Export yesterday's requests
+    yesterday = (datetime.now() - timedelta(days=1)).isoformat()
+    
+    data = export_helicone_data({
+        "properties": {"Environment": "production"},
+        "request_created_at": {"gte": yesterday}
+    })
+    
+    if not data:
+        print("No requests to evaluate")
+        return
+    
+    # Save to CSV
+    df = pd.DataFrame(data)
+    df.to_csv('daily_export.csv', index=False)
+    
+    # Add ground truth (in production, use labeled dataset)
+    add_ground_truth_column('daily_export.csv', 'daily_labeled.csv')
+    
+    # Run evaluation
+    dataset = prepare_ragas_dataset('daily_labeled.csv')
+    results = evaluate(dataset, metrics=[answer_correctness, answer_similarity])
+    
+    # Sync scores
+    results_df = results.to_pandas()
+    sync_ragas_scores(results_df)
+    
+    # Alert if quality drops
+    avg_correctness = results_df['answer_correctness'].mean()
+    if avg_correctness < 0.7:
+        print(f"ALERT: Quality dropped to {avg_correctness:.3f}")
+        # Send alert via email/Slack
+
+# Schedule daily evaluation
+schedule.every().day.at("02:00").do(daily_evaluation)
+
+while True:
+    schedule.run_pending()
+    time.sleep(3600)
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Start Small" icon="seedling">
+    Begin with 20-50 examples to validate your pipeline. Scale up once confident in your labeling and metrics.
+  </Accordion>
+
+  <Accordion title="Use Representative Data" icon="chart-pie">
+    Evaluate on data that matches your production distribution. Include edge cases and common queries.
+  </Accordion>
+
+  <Accordion title="Multiple Metrics" icon="chart-line">
+    Don't rely on a single metric. Use correctness, similarity, and relevancy together for comprehensive assessment.
+  </Accordion>
+
+  <Accordion title="Track Over Time" icon="clock">
+    Monitor score trends weekly. Sudden drops indicate quality regressions that need immediate attention.
+  </Accordion>
+
+  <Accordion title="Investigate Failures" icon="magnifying-glass">
+    When scores drop, filter in Helicone by score range to find and fix problematic cases.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Experiments" icon="flask" href="/guides/experiments">
+    Use evaluation results to guide A/B testing
+  </Card>
+  <Card title="Fine-Tuning" icon="sliders" href="/guides/fine-tuning">
+    Build training datasets from high-scoring examples
+  </Card>
+  <Card title="Custom Properties" icon="tags" href="/features/advanced-usage/custom-properties">
+    Tag requests for targeted evaluation
+  </Card>
+  <Card title="RAGAS Docs" icon="book" href="https://docs.ragas.io/">
+    Deep dive into RAGAS metrics and configuration
+  </Card>
+</CardGroup>

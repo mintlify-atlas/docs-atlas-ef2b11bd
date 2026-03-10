@@ -1,0 +1,418 @@
+---
+title: 'Webhooks'
+description: 'Receive real-time notifications for requests, alerts, and events in your system'
+---
+
+## Overview
+
+Helicone webhooks enable you to receive real-time HTTP notifications when events occur in your account. Send request data, alerts, and custom events to your own endpoints for processing, logging, or integration with other systems.
+
+<Info>
+Webhooks are perfect for:
+- Real-time logging and monitoring
+- Custom analytics pipelines
+- Triggering workflows based on AI responses
+- Integrating with internal tools and dashboards
+- Building audit trails
+</Info>
+
+## Key Benefits
+
+<CardGroup cols={2}>
+  <Card title="Real-Time Events" icon="bolt">
+    Receive notifications instantly as requests are processed
+  </Card>
+  <Card title="Flexible Filtering" icon="filter">
+    Use property filters to only receive relevant events
+  </Card>
+  <Card title="Sample Rate Control" icon="percent">
+    Control webhook volume with configurable sample rates
+  </Card>
+  <Card title="Secure Delivery" icon="shield">
+    HMAC signatures verify webhook authenticity
+  </Card>
+</CardGroup>
+
+## Setup
+
+### 1. Create a Webhook Endpoint
+
+First, create an endpoint in your application to receive webhooks:
+
+<Tabs>
+  <Tab title="Node.js/Express">
+    ```typescript
+    import express from 'express';
+    import crypto from 'crypto';
+
+    const app = express();
+    app.use(express.json());
+
+    app.post('/webhooks/helicone', (req, res) => {
+      // Verify webhook signature
+      const signature = req.headers['x-helicone-signature'];
+      const hmacKey = process.env.HELICONE_WEBHOOK_HMAC_KEY;
+      
+      const computedSignature = crypto
+        .createHmac('sha256', hmacKey)
+        .update(JSON.stringify(req.body))
+        .digest('hex');
+
+      if (signature !== computedSignature) {
+        return res.status(401).send('Invalid signature');
+      }
+
+      // Process webhook payload
+      const { request, response, metadata } = req.body;
+      console.log('Received webhook:', metadata.requestId);
+
+      res.status(200).send('Webhook received');
+    });
+
+    app.listen(3000);
+    ```
+  </Tab>
+  
+  <Tab title="Python/Flask">
+    ```python
+    from flask import Flask, request, jsonify
+    import hmac
+    import hashlib
+    import json
+    import os
+
+    app = Flask(__name__)
+
+    @app.route('/webhooks/helicone', methods=['POST'])
+    def handle_webhook():
+        # Verify webhook signature
+        signature = request.headers.get('X-Helicone-Signature')
+        hmac_key = os.getenv('HELICONE_WEBHOOK_HMAC_KEY')
+        
+        computed_signature = hmac.new(
+            hmac_key.encode(),
+            request.get_data(),
+            hashlib.sha256
+        ).hexdigest()
+
+        if signature != computed_signature:
+            return jsonify({'error': 'Invalid signature'}), 401
+
+        # Process webhook payload
+        payload = request.get_json()
+        print(f"Received webhook: {payload['metadata']['requestId']}")
+
+        return jsonify({'status': 'success'}), 200
+
+    if __name__ == '__main__':
+        app.run(port=3000)
+    ```
+  </Tab>
+  
+  <Tab title="Next.js API Route">
+    ```typescript
+    // app/api/webhooks/helicone/route.ts
+    import { NextRequest, NextResponse } from 'next/server';
+    import crypto from 'crypto';
+
+    export async function POST(request: NextRequest) {
+      const body = await request.text();
+      const signature = request.headers.get('x-helicone-signature');
+      const hmacKey = process.env.HELICONE_WEBHOOK_HMAC_KEY!;
+
+      // Verify signature
+      const computedSignature = crypto
+        .createHmac('sha256', hmacKey)
+        .update(body)
+        .digest('hex');
+
+      if (signature !== computedSignature) {
+        return NextResponse.json(
+          { error: 'Invalid signature' },
+          { status: 401 }
+        );
+      }
+
+      // Process webhook
+      const payload = JSON.parse(body);
+      console.log('Webhook received:', payload.metadata.requestId);
+
+      return NextResponse.json({ status: 'success' });
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### 2. Register Your Webhook
+
+Use the Helicone API to create a webhook:
+
+```bash
+curl -X POST https://api.helicone.ai/v1/webhooks \
+  -H "Authorization: Bearer $HELICONE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "destination": "https://your-domain.com/webhooks/helicone",
+    "config": {
+      "sampleRate": 100,
+      "propertyFilters": []
+    },
+    "includeData": true
+  }'
+```
+
+**Response:**
+```json
+{
+  "data": {
+    "id": "webhook_123",
+    "destination": "https://your-domain.com/webhooks/helicone",
+    "hmac_key": "your-hmac-key-for-verification",
+    "created_at": "2024-03-10T12:00:00Z"
+  }
+}
+```
+
+<Warning>
+Store the `hmac_key` securely! You'll need it to verify webhook signatures.
+</Warning>
+
+## Webhook Configuration
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `destination` | string | Yes | HTTPS URL where webhooks will be sent |
+| `config.sampleRate` | number | No | Percentage of events to send (0-100, default: 100) |
+| `config.propertyFilters` | array | No | Filter events by property key-value pairs |
+| `includeData` | boolean | No | Include full request/response data (default: true) |
+
+### Sample Rate
+
+Control webhook volume by sampling events:
+
+```json
+{
+  "destination": "https://your-domain.com/webhooks/helicone",
+  "config": {
+    "sampleRate": 10  // Send 10% of events
+  }
+}
+```
+
+### Property Filters
+
+Only receive webhooks for specific properties:
+
+```json
+{
+  "destination": "https://your-domain.com/webhooks/helicone",
+  "config": {
+    "propertyFilters": [
+      { "key": "environment", "value": "production" },
+      { "key": "user-tier", "value": "enterprise" }
+    ]
+  }
+}
+```
+
+## Webhook Payload
+
+Webhooks contain detailed request and response data:
+
+```json
+{
+  "version": "2024-10-22",
+  "metadata": {
+    "requestId": "req_abc123",
+    "organizationId": "org_xyz789",
+    "timestamp": "2024-03-10T12:34:56Z",
+    "event": "request.completed"
+  },
+  "request": {
+    "model": "gpt-4o-mini",
+    "messages": [
+      { "role": "user", "content": "Hello!" }
+    ],
+    "temperature": 0.7,
+    "max_tokens": 100
+  },
+  "response": {
+    "id": "chatcmpl-123",
+    "choices": [
+      {
+        "message": {
+          "role": "assistant",
+          "content": "Hi! How can I help you today?"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 10,
+      "completion_tokens": 12,
+      "total_tokens": 22
+    }
+  },
+  "metrics": {
+    "latency_ms": 1523,
+    "cost_usd": 0.00034,
+    "cached": false
+  },
+  "properties": {
+    "user-id": "user_123",
+    "environment": "production"
+  }
+}
+```
+
+## Managing Webhooks
+
+### List Webhooks
+
+```bash
+curl https://api.helicone.ai/v1/webhooks \
+  -H "Authorization: Bearer $HELICONE_API_KEY"
+```
+
+### Test a Webhook
+
+Send a test event to verify your endpoint:
+
+```bash
+curl -X POST https://api.helicone.ai/v1/webhooks/{webhookId}/test \
+  -H "Authorization: Bearer $HELICONE_API_KEY"
+```
+
+### Delete a Webhook
+
+```bash
+curl -X DELETE https://api.helicone.ai/v1/webhooks/{webhookId} \
+  -H "Authorization: Bearer $HELICONE_API_KEY"
+```
+
+## Security
+
+### HMAC Signature Verification
+
+Every webhook includes an `X-Helicone-Signature` header with an HMAC SHA-256 signature:
+
+```typescript
+import crypto from 'crypto';
+
+function verifyWebhookSignature(
+  payload: string,
+  signature: string,
+  hmacKey: string
+): boolean {
+  const computedSignature = crypto
+    .createHmac('sha256', hmacKey)
+    .update(payload)
+    .digest('hex');
+
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(computedSignature)
+  );
+}
+```
+
+<Warning>
+Always verify webhook signatures to prevent unauthorized requests to your endpoint.
+</Warning>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always verify signatures">
+    Validate the HMAC signature on every webhook to ensure it came from Helicone and hasn't been tampered with.
+  </Accordion>
+
+  <Accordion title="Respond quickly">
+    Acknowledge webhooks with a 200 status code within 5 seconds. Process heavy work asynchronously:
+
+    ```typescript
+    app.post('/webhooks/helicone', async (req, res) => {
+      // Verify signature first
+      if (!verifySignature(req)) {
+        return res.status(401).send('Invalid signature');
+      }
+
+      // Acknowledge immediately
+      res.status(200).send('OK');
+
+      // Process asynchronously
+      processWebhookAsync(req.body);
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Handle retries gracefully">
+    Helicone retries failed webhooks with exponential backoff. Make your endpoint idempotent using the `requestId` to avoid duplicate processing.
+  </Accordion>
+
+  <Accordion title="Use sample rates for high volume">
+    If you're processing millions of requests, use sample rates to reduce webhook volume while maintaining visibility.
+  </Accordion>
+
+  <Accordion title="Filter with properties">
+    Use property filters to only receive webhooks for critical events, reducing noise and processing overhead.
+  </Accordion>
+
+  <Accordion title="Monitor webhook health">
+    Track webhook delivery success rates and response times to ensure your endpoint is healthy.
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Custom Analytics" icon="chart-line">
+    Stream request data to your data warehouse or analytics platform for custom reporting
+  </Card>
+  <Card title="Compliance Logging" icon="file-contract">
+    Maintain audit trails of all AI interactions for regulatory compliance
+  </Card>
+  <Card title="Real-Time Monitoring" icon="gauge">
+    Trigger alerts or dashboards based on latency, cost, or error patterns
+  </Card>
+  <Card title="Workflow Automation" icon="diagram-project">
+    Trigger downstream processes when specific AI responses are detected
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Webhooks not being received">
+    - Verify your endpoint is publicly accessible via HTTPS
+    - Check that your server responds with 200 status codes
+    - Ensure firewall rules allow incoming traffic
+    - Test with the test endpoint first
+  </Accordion>
+
+  <Accordion title="Signature verification failing">
+    - Use the raw request body for signature verification (before parsing)
+    - Ensure you're using the correct HMAC key from webhook creation
+    - Check that you're using SHA-256 hashing
+    - Use timing-safe comparison to prevent timing attacks
+  </Accordion>
+
+  <Accordion title="High latency or timeouts">
+    - Process webhooks asynchronously after acknowledging
+    - Optimize your endpoint for quick responses (< 1 second)
+    - Consider using a message queue for processing
+  </Accordion>
+</AccordionGroup>
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card title="Alerts" icon="bell" href="/features/alerts">
+    Get notified via email or Slack for threshold-based conditions
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/endpoint/webhook">
+    Full API documentation for webhook management
+  </Card>
+</CardGroup>

@@ -1,0 +1,893 @@
+---
+title: "Structured Outputs with OpenAI"
+description: "Build reliable LLM applications using OpenAI's function calling and structured outputs with monitoring"
+sidebarTitle: "Structured Outputs"
+---
+
+Structured outputs ensure your LLM responses match a predefined schema, making them reliable and easy to parse. This tutorial shows you how to use OpenAI's function calling and structured outputs while monitoring everything with Helicone.
+
+## What Are Structured Outputs?
+
+Structured outputs force the model to return data in a specific format:
+
+<CardGroup cols={2}>
+  <Card title="Function Calling" icon="function">
+    Model calls predefined functions with typed parameters
+  </Card>
+  <Card title="Response Format" icon="code">
+    Model returns JSON matching a specified schema
+  </Card>
+</CardGroup>
+
+Both approaches use `strict: true` to guarantee schema compliance.
+
+## Prerequisites
+
+- Python 3.8+ or Node.js 18+
+- OpenAI API key
+- Helicone API key ([sign up free](https://helicone.ai/signup))
+
+## Setup
+
+<Tabs>
+  <Tab title="Python">
+    ```bash
+    pip install openai pydantic python-dotenv
+    ```
+
+    Create `.env`:
+    ```bash
+    OPENAI_API_KEY=sk-your-openai-key
+    HELICONE_API_KEY=sk-your-helicone-key
+    ```
+  </Tab>
+
+  <Tab title="TypeScript">
+    ```bash
+    npm install openai zod
+    ```
+
+    Create `.env`:
+    ```bash
+    OPENAI_API_KEY=sk-your-openai-key
+    HELICONE_API_KEY=sk-your-helicone-key
+    ```
+  </Tab>
+</Tabs>
+
+## What We'll Build
+
+A flight booking assistant that:
+1. **Extracts search parameters** using function calling
+2. **Searches a database** with extracted parameters
+3. **Formats results** using structured outputs
+4. **Tracks everything** in Helicone
+
+## Implementation
+
+### Step 1: Define Data Models
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    from pydantic import BaseModel
+    from typing import List, Optional
+
+    class FlightSearchParams(BaseModel):
+        """Parameters for searching flights"""
+        departure: str
+        arrival: str
+        date: Optional[str] = None
+
+    class FlightDetails(BaseModel):
+        """Details about a single flight"""
+        flight_number: str
+        departure: str
+        arrival: str
+        departure_time: str
+        arrival_time: str
+        price: float
+        available_seats: int
+
+    class FlightResponse(BaseModel):
+        """Complete response with flights and explanation"""
+        flights: List[FlightDetails]
+        natural_response: str
+        total_results: int
+    ```
+  </Tab>
+
+  <Tab title="TypeScript">
+    ```typescript
+    import { z } from 'zod';
+
+    const FlightSearchParams = z.object({
+      departure: z.string().describe('Departure city'),
+      arrival: z.string().describe('Arrival city'),
+      date: z.string().optional().describe('Flight date in YYYY-MM-DD format'),
+    });
+
+    const FlightDetails = z.object({
+      flight_number: z.string(),
+      departure: z.string(),
+      arrival: z.string(),
+      departure_time: z.string(),
+      arrival_time: z.string(),
+      price: z.number(),
+      available_seats: z.number(),
+    });
+
+    const FlightResponse = z.object({
+      flights: z.array(FlightDetails),
+      natural_response: z.string(),
+      total_results: z.number(),
+    });
+
+    type FlightSearchParams = z.infer<typeof FlightSearchParams>;
+    type FlightResponse = z.infer<typeof FlightResponse>;
+    ```
+  </Tab>
+</Tabs>
+
+### Step 2: Initialize OpenAI with Helicone
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    from openai import OpenAI
+    import os
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
+    client = OpenAI(
+        api_key=os.getenv('OPENAI_API_KEY'),
+        base_url='https://oai.helicone.ai/v1',
+        default_headers={
+            'Helicone-Auth': f"Bearer {os.getenv('HELICONE_API_KEY')}"
+        }
+    )
+    ```
+  </Tab>
+
+  <Tab title="TypeScript">
+    ```typescript
+    import { OpenAI } from 'openai';
+
+    const client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      baseURL: 'https://oai.helicone.ai/v1',
+      defaultHeaders: {
+        'Helicone-Auth': `Bearer ${process.env.HELICONE_API_KEY}`,
+      },
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### Step 3: Use Function Calling to Extract Parameters
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import json
+
+    def extract_search_params(user_query: str) -> FlightSearchParams:
+        """Use function calling to extract structured search parameters"""
+        
+        response = client.chat.completions.create(
+            model='gpt-4o-2024-08-06',
+            messages=[
+                {
+                    'role': 'system',
+                    'content': 'Extract flight search parameters from user queries.'
+                },
+                {
+                    'role': 'user',
+                    'content': user_query
+                }
+            ],
+            tools=[
+                {
+                    'type': 'function',
+                    'function': {
+                        'name': 'search_flights',
+                        'description': 'Search for flights based on criteria',
+                        'strict': True,
+                        'parameters': {
+                            'type': 'object',
+                            'properties': {
+                                'departure': {
+                                    'type': 'string',
+                                    'description': 'Departure city'
+                                },
+                                'arrival': {
+                                    'type': 'string',
+                                    'description': 'Arrival city'
+                                },
+                                'date': {
+                                    'type': 'string',
+                                    'description': 'Flight date (YYYY-MM-DD)'
+                                }
+                            },
+                            'required': ['departure', 'arrival'],
+                            'additionalProperties': False
+                        }
+                    }
+                }
+            ],
+            tool_choice={
+                'type': 'function',
+                'function': {'name': 'search_flights'}
+            },
+            extra_headers={
+                'Helicone-Property-Step': 'parameter-extraction',
+                'Helicone-Property-User-Query': user_query[:100]
+            }
+        )
+        
+        # Extract parameters from tool call
+        tool_call = response.choices[0].message.tool_calls[0]
+        params_dict = json.loads(tool_call.function.arguments)
+        
+        return FlightSearchParams(**params_dict)
+
+    # Test it
+    query = "Find me flights from New York to London on January 15th"
+    params = extract_search_params(query)
+    print(f"Extracted: {params}")
+    # Output: Extracted: departure='New York' arrival='London' date='2025-01-15'
+    ```
+  </Tab>
+
+  <Tab title="TypeScript">
+    ```typescript
+    async function extractSearchParams(userQuery: string) {
+      const response = await client.chat.completions.create(
+        {
+          model: 'gpt-4o-2024-08-06',
+          messages: [
+            {
+              role: 'system',
+              content: 'Extract flight search parameters from user queries.',
+            },
+            {
+              role: 'user',
+              content: userQuery,
+            },
+          ],
+          tools: [
+            {
+              type: 'function',
+              function: {
+                name: 'search_flights',
+                description: 'Search for flights based on criteria',
+                strict: true,
+                parameters: {
+                  type: 'object',
+                  properties: {
+                    departure: {
+                      type: 'string',
+                      description: 'Departure city',
+                    },
+                    arrival: {
+                      type: 'string',
+                      description: 'Arrival city',
+                    },
+                    date: {
+                      type: 'string',
+                      description: 'Flight date (YYYY-MM-DD)',
+                    },
+                  },
+                  required: ['departure', 'arrival'],
+                  additionalProperties: false,
+                },
+              },
+            },
+          ],
+          tool_choice: {
+            type: 'function',
+            function: { name: 'search_flights' },
+          },
+        },
+        {
+          headers: {
+            'Helicone-Property-Step': 'parameter-extraction',
+            'Helicone-Property-User-Query': userQuery.substring(0, 100),
+          },
+        }
+      );
+
+      const toolCall = response.choices[0].message.tool_calls![0];
+      return JSON.parse(toolCall.function.arguments) as FlightSearchParams;
+    }
+
+    // Test it
+    const query = 'Find me flights from New York to London on January 15th';
+    const params = await extractSearchParams(query);
+    console.log('Extracted:', params);
+    ```
+  </Tab>
+</Tabs>
+
+### Step 4: Search Flight Database
+
+Simulate a database search:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    from typing import List, Dict
+
+    # Mock flight database
+    FLIGHTS_DB = [
+        {
+            'flight_number': 'BA123',
+            'departure': 'New York',
+            'arrival': 'London',
+            'departure_time': '2025-01-15T08:30:00',
+            'arrival_time': '2025-01-15T20:45:00',
+            'price': 650.00,
+            'available_seats': 45
+        },
+        {
+            'flight_number': 'AA456',
+            'departure': 'New York',
+            'arrival': 'London',
+            'departure_time': '2025-01-15T14:15:00',
+            'arrival_time': '2025-01-16T02:30:00',
+            'price': 720.00,
+            'available_seats': 12
+        },
+        {
+            'flight_number': 'UA789',
+            'departure': 'London',
+            'arrival': 'New York',
+            'departure_time': '2025-01-16T10:00:00',
+            'arrival_time': '2025-01-16T13:15:00',
+            'price': 690.00,
+            'available_seats': 28
+        }
+    ]
+
+    def search_flights(
+        departure: str, 
+        arrival: str, 
+        date: Optional[str] = None
+    ) -> List[Dict]:
+        """Search for matching flights"""
+        matches = []
+        
+        for flight in FLIGHTS_DB:
+            # Match cities
+            if (flight['departure'].lower() == departure.lower() and
+                flight['arrival'].lower() == arrival.lower()):
+                
+                # Optionally filter by date
+                if date:
+                    flight_date = flight['departure_time'].split('T')[0]
+                    if flight_date == date:
+                        matches.append(flight)
+                else:
+                    matches.append(flight)
+        
+        return matches
+    ```
+  </Tab>
+
+  <Tab title="TypeScript">
+    ```typescript
+    const FLIGHTS_DB = [
+      {
+        flight_number: 'BA123',
+        departure: 'New York',
+        arrival: 'London',
+        departure_time: '2025-01-15T08:30:00',
+        arrival_time: '2025-01-15T20:45:00',
+        price: 650.0,
+        available_seats: 45,
+      },
+      {
+        flight_number: 'AA456',
+        departure: 'New York',
+        arrival: 'London',
+        departure_time: '2025-01-15T14:15:00',
+        arrival_time: '2025-01-16T02:30:00',
+        price: 720.0,
+        available_seats: 12,
+      },
+      {
+        flight_number: 'UA789',
+        departure: 'London',
+        arrival: 'New York',
+        departure_time: '2025-01-16T10:00:00',
+        arrival_time: '2025-01-16T13:15:00',
+        price: 690.0,
+        available_seats: 28,
+      },
+    ];
+
+    function searchFlights(
+      departure: string,
+      arrival: string,
+      date?: string
+    ) {
+      return FLIGHTS_DB.filter((flight) => {
+        const matchesCities =
+          flight.departure.toLowerCase() === departure.toLowerCase() &&
+          flight.arrival.toLowerCase() === arrival.toLowerCase();
+
+        if (!matchesCities) return false;
+
+        if (date) {
+          const flightDate = flight.departure_time.split('T')[0];
+          return flightDate === date;
+        }
+
+        return true;
+      });
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Step 5: Format Response with Structured Outputs
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    def format_flight_response(
+        user_query: str,
+        found_flights: List[Dict]
+    ) -> FlightResponse:
+        """Use structured outputs to format the response"""
+        
+        response = client.beta.chat.completions.parse(
+            model='gpt-4o-2024-08-06',
+            messages=[
+                {
+                    'role': 'system',
+                    'content': '''You are a flight search assistant. 
+                    Format search results with:
+                    1. Structured flight details
+                    2. A natural language explanation
+                    
+                    Be helpful and concise. If no flights found, 
+                    suggest alternatives.'''
+                },
+                {
+                    'role': 'user',
+                    'content': f'''Original query: {user_query}
+                    
+                    Found flights:
+                    {json.dumps(found_flights, indent=2)}'''
+                }
+            ],
+            response_format=FlightResponse,
+            extra_headers={
+                'Helicone-Property-Step': 'response-formatting',
+                'Helicone-Property-Results-Count': str(len(found_flights))
+            }
+        )
+        
+        return response.choices[0].message.parsed
+
+    # Test it
+    params = extract_search_params(
+        "Find flights from New York to London on January 15th"
+    )
+    flights = search_flights(params.departure, params.arrival, params.date)
+    formatted = format_flight_response(
+        "Find flights from New York to London on January 15th",
+        flights
+    )
+
+    print(f"Found {formatted.total_results} flights")
+    print(f"Response: {formatted.natural_response}")
+    for flight in formatted.flights:
+        print(f"  - {flight.flight_number}: ${flight.price}")
+    ```
+  </Tab>
+
+  <Tab title="TypeScript">
+    ```typescript
+    async function formatFlightResponse(
+      userQuery: string,
+      foundFlights: any[]
+    ) {
+      const response = await client.beta.chat.completions.parse(
+        {
+          model: 'gpt-4o-2024-08-06',
+          messages: [
+            {
+              role: 'system',
+              content: `You are a flight search assistant. 
+              Format search results with:
+              1. Structured flight details
+              2. A natural language explanation
+              
+              Be helpful and concise. If no flights found, 
+              suggest alternatives.`,
+            },
+            {
+              role: 'user',
+              content: `Original query: ${userQuery}
+              
+              Found flights:
+              ${JSON.stringify(foundFlights, null, 2)}`,
+            },
+          ],
+          response_format: zodResponseFormat(FlightResponse, 'flight_response'),
+        },
+        {
+          headers: {
+            'Helicone-Property-Step': 'response-formatting',
+            'Helicone-Property-Results-Count': String(foundFlights.length),
+          },
+        }
+      );
+
+      return response.choices[0].message.parsed!;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Step 6: Handle Refusals
+
+Structured outputs can refuse unsafe requests:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    def process_query(query: str) -> str:
+        """Complete query processing with refusal handling"""
+        
+        try:
+            # Extract parameters
+            params = extract_search_params(query)
+            
+            # Search database
+            flights = search_flights(
+                params.departure, 
+                params.arrival, 
+                params.date
+            )
+            
+            # Format response
+            response = client.beta.chat.completions.parse(
+                model='gpt-4o-2024-08-06',
+                messages=[
+                    {
+                        'role': 'system',
+                        'content': 'Format flight search results'
+                    },
+                    {
+                        'role': 'user',
+                        'content': f"Query: {query}\nFlights: {json.dumps(flights)}"
+                    }
+                ],
+                response_format=FlightResponse
+            )
+            
+            message = response.choices[0].message
+            
+            # Check for refusal
+            if message.refusal:
+                print(f"Request refused: {message.refusal}")
+                return "I'm unable to process that request."
+            
+            # Return parsed response
+            parsed = message.parsed
+            return parsed.natural_response
+            
+        except Exception as e:
+            print(f"Error: {e}")
+            return "An error occurred processing your request."
+    ```
+  </Tab>
+
+  <Tab title="TypeScript">
+    ```typescript
+    async function processQuery(query: string): Promise<string> {
+      try {
+        const params = await extractSearchParams(query);
+        const flights = searchFlights(params.departure, params.arrival, params.date);
+
+        const response = await client.beta.chat.completions.parse({
+          model: 'gpt-4o-2024-08-06',
+          messages: [
+            {
+              role: 'system',
+              content: 'Format flight search results',
+            },
+            {
+              role: 'user',
+              content: `Query: ${query}\nFlights: ${JSON.stringify(flights)}`,
+            },
+          ],
+          response_format: zodResponseFormat(FlightResponse, 'flight_response'),
+        });
+
+        const message = response.choices[0].message;
+
+        // Check for refusal
+        if (message.refusal) {
+          console.log(`Request refused: ${message.refusal}`);
+          return "I'm unable to process that request.";
+        }
+
+        return message.parsed!.natural_response;
+      } catch (error) {
+        console.error('Error:', error);
+        return 'An error occurred processing your request.';
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Step 7: Track Refusals in Helicone
+
+Filter for refused requests in your dashboard:
+
+1. Go to [Helicone Requests](https://helicone.ai/requests)
+2. Add filter: **`refusal`** exists
+3. Review why requests were refused
+
+This helps identify:
+- False positives (safe requests incorrectly refused)
+- Patterns in refused content
+- Opportunities to improve prompts
+
+## Complete Flight Assistant
+
+Put everything together:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    #!/usr/bin/env python3
+    """
+    Flight booking assistant with structured outputs
+    """
+    from openai import OpenAI
+    from pydantic import BaseModel
+    from typing import List, Optional
+    import json
+    import os
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
+    # Initialize client
+    client = OpenAI(
+        api_key=os.getenv('OPENAI_API_KEY'),
+        base_url='https://oai.helicone.ai/v1',
+        default_headers={
+            'Helicone-Auth': f"Bearer {os.getenv('HELICONE_API_KEY')}"
+        }
+    )
+
+    class FlightAssistant:
+        def __init__(self):
+            self.flights_db = FLIGHTS_DB
+        
+        def process_query(self, query: str, session_id: str) -> str:
+            """Process a complete flight search query"""
+            
+            # Step 1: Extract parameters
+            params = self._extract_params(query, session_id)
+            
+            # Step 2: Search flights
+            flights = self._search(params, session_id)
+            
+            # Step 3: Format response
+            response = self._format_response(query, flights, session_id)
+            
+            return response.natural_response
+        
+        def _extract_params(self, query: str, session_id: str):
+            response = client.chat.completions.create(
+                model='gpt-4o-2024-08-06',
+                messages=[...],  # As shown above
+                tools=[...],
+                tool_choice={...},
+                extra_headers={
+                    'Helicone-Session-Id': session_id,
+                    'Helicone-Session-Path': '/extract-params',
+                }
+            )
+            tool_call = response.choices[0].message.tool_calls[0]
+            return FlightSearchParams(**json.loads(tool_call.function.arguments))
+        
+        def _search(self, params, session_id):
+            return search_flights(params.departure, params.arrival, params.date)
+        
+        def _format_response(self, query, flights, session_id):
+            response = client.beta.chat.completions.parse(
+                model='gpt-4o-2024-08-06',
+                messages=[...],  # As shown above
+                response_format=FlightResponse,
+                extra_headers={
+                    'Helicone-Session-Id': session_id,
+                    'Helicone-Session-Path': '/format-response',
+                }
+            )
+            return response.choices[0].message.parsed
+
+    # Usage
+    assistant = FlightAssistant()
+    
+    queries = [
+        "Find flights from New York to London on January 15th",
+        "I need to get to Paris from San Francisco next week",
+        "Show me the cheapest flights to Tokyo"
+    ]
+    
+    for i, query in enumerate(queries):
+        session_id = f"session-{i}"
+        print(f"\nQuery: {query}")
+        result = assistant.process_query(query, session_id)
+        print(f"Response: {result}")
+    ```
+  </Tab>
+
+  <Tab title="TypeScript">
+    ```typescript
+    import { OpenAI } from 'openai';
+    import { z } from 'zod';
+
+    const client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      baseURL: 'https://oai.helicone.ai/v1',
+      defaultHeaders: {
+        'Helicone-Auth': `Bearer ${process.env.HELICONE_API_KEY}`,
+      },
+    });
+
+    class FlightAssistant {
+      async processQuery(query: string, sessionId: string): Promise<string> {
+        // Extract parameters
+        const params = await this.extractParams(query, sessionId);
+
+        // Search flights
+        const flights = this.search(params);
+
+        // Format response
+        const response = await this.formatResponse(query, flights, sessionId);
+
+        return response.natural_response;
+      }
+
+      private async extractParams(query: string, sessionId: string) {
+        // Implementation as shown above
+        // ...
+      }
+
+      private search(params: FlightSearchParams) {
+        return searchFlights(params.departure, params.arrival, params.date);
+      }
+
+      private async formatResponse(query: string, flights: any[], sessionId: string) {
+        // Implementation as shown above
+        // ...
+      }
+    }
+
+    // Usage
+    const assistant = new FlightAssistant();
+
+    const queries = [
+      'Find flights from New York to London on January 15th',
+      'I need to get to Paris from San Francisco next week',
+      'Show me the cheapest flights to Tokyo',
+    ];
+
+    for (const [i, query] of queries.entries()) {
+      const sessionId = `session-${i}`;
+      console.log(`\nQuery: ${query}`);
+      const result = await assistant.processQuery(query, sessionId);
+      console.log(`Response: ${result}`);
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Monitoring in Helicone
+
+View your structured outputs in the dashboard:
+
+### Session View
+
+Each query creates a session with:
+1. Parameter extraction request
+2. Response formatting request
+
+Click any session to see the complete flow and costs.
+
+### Filter by Refusals
+
+To see refused requests:
+1. Go to **Requests**
+2. Add filter: `refusal` field exists
+3. Review and adjust prompts if needed
+
+### Track Tool Usage
+
+Filter by `Step` property:
+- `parameter-extraction` - How often is extraction called?
+- `response-formatting` - How many results are formatted?
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always Use strict: true" icon="lock">
+    Setting `strict: true` guarantees schema compliance. Without it, the model may return invalid data.
+  </Accordion>
+
+  <Accordion title="Handle Refusals Gracefully" icon="hand">
+    Always check `message.refusal` and provide fallback responses. Track refusals in Helicone to identify patterns.
+  </Accordion>
+
+  <Accordion title="Keep Schemas Simple" icon="minimize">
+    Complex nested schemas are harder for models to follow. Start simple and add complexity only when needed.
+  </Accordion>
+
+  <Accordion title="Use Descriptive Field Names" icon="text">
+    Clear field names and descriptions help the model understand what you want. Use `description` liberally.
+  </Accordion>
+
+  <Accordion title="Test Edge Cases" icon="flask">
+    Test with unusual inputs, missing data, and ambiguous queries. Track failures in Helicone.
+  </Accordion>
+</AccordionGroup>
+
+## Common Issues
+
+### Schema Validation Errors
+
+If you see validation errors:
+
+```python
+# Problem: Schema too strict
+class Response(BaseModel):
+    value: int  # Fails if model returns float
+
+# Solution: Allow flexibility
+class Response(BaseModel):
+    value: float  # Accepts both int and float
+```
+
+### Refusals on Valid Requests
+
+If safe requests are refused:
+
+1. Review refusal reasons in Helicone
+2. Adjust system prompt to be clearer
+3. Add examples of acceptable requests
+
+### Inconsistent Outputs
+
+If outputs vary despite schemas:
+
+1. Check `strict: true` is set
+2. Use temperature 0 for deterministic results
+3. Provide clearer field descriptions
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Agent Tracing" icon="diagram-project" href="/guides/agent-tracing">
+    Build agents with multiple tool calls
+  </Card>
+  <Card title="Vercel AI Gateway" icon="route" href="/guides/tutorials/vercel-ai-gateway">
+    Add model routing and complexity classification
+  </Card>
+  <Card title="Custom Properties" icon="tags" href="/features/advanced-usage/custom-properties">
+    Track structured output usage with metadata
+  </Card>
+  <Card title="OpenAI Docs" icon="book" href="https://platform.openai.com/docs/guides/structured-outputs">
+    Deep dive into OpenAI's structured outputs
+  </Card>
+</CardGroup>

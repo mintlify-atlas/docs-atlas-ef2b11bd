@@ -1,0 +1,462 @@
+---
+title: "Automatic Fallbacks"
+description: "Configure automatic failover strategies for reliable AI applications"
+---
+
+## Overview
+
+Helicone AI Gateway provides automatic fallback capabilities to ensure your AI applications remain reliable even when individual providers fail. When a request fails, the gateway automatically tries alternative providers in the order you specify.
+
+## How Fallbacks Work
+
+The gateway processes fallbacks in a predictable order:
+
+<Steps>
+  <Step title="Primary Attempt">
+    The gateway tries the first model/provider in your list.
+  </Step>
+
+  <Step title="Failure Detection">
+    If the request fails (rate limit, timeout, service error, etc.), the gateway moves to the next option.
+  </Step>
+
+  <Step title="Automatic Retry">
+    The gateway automatically retries with the next model/provider in your list.
+  </Step>
+
+  <Step title="Success or Exhaustion">
+    The process continues until a request succeeds or all options are exhausted.
+  </Step>
+</Steps>
+
+<Info>
+Fallbacks work across both BYOK (Bring Your Own Key) and PTB (Pass-Through Billing) authentication methods.
+</Info>
+
+## Basic Fallback Configuration
+
+### Same Model, Different Providers
+
+Route the same model through different providers:
+
+```typescript
+const response = await client.chat.completions.create({
+  model: "gpt-4o/openai,gpt-4o/azure,gpt-4o/deepinfra",
+  messages: [{ role: "user", content: "Hello!" }],
+});
+```
+
+**Fallback chain:**
+1. OpenAI (primary)
+2. Azure OpenAI (if OpenAI fails)
+3. DeepInfra (if Azure fails)
+
+### Different Models
+
+Fallback to different models:
+
+```typescript
+const response = await client.chat.completions.create({
+  model: "gpt-4o,gpt-4o-mini,claude-sonnet-4",
+  messages: [{ role: "user", content: "Hello!" }],
+});
+```
+
+**Fallback chain:**
+1. GPT-4o (best available provider)
+2. GPT-4o-mini (cheaper alternative)
+3. Claude Sonnet 4 (different model family)
+
+### Cross-Provider Fallback
+
+Fallback across different cloud providers:
+
+```typescript
+const response = await client.chat.completions.create({
+  model: "claude-3-7-sonnet-20250219/bedrock,claude-3-7-sonnet-20250219/anthropic,claude-3-7-sonnet-20250219/vertex",
+  messages: [{ role: "user", content: "Hello!" }],
+});
+```
+
+**Fallback chain:**
+1. AWS Bedrock (primary)
+2. Anthropic direct (if Bedrock fails)
+3. Google Vertex AI (if Anthropic fails)
+
+## Common Fallback Patterns
+
+<Tabs>
+  <Tab title="Cost Optimization">
+    Try cheaper providers first, fallback to premium:
+    
+    ```typescript
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini/deepinfra,gpt-4o-mini/openai,gpt-4o",
+      messages: [{ role: "user", content: "Hello!" }],
+    });
+    ```
+    
+    **Pattern:**
+    1. DeepInfra (lowest cost)
+    2. OpenAI standard (if DeepInfra unavailable)
+    3. GPT-4o (best quality, highest cost)
+  </Tab>
+
+  <Tab title="Regional Resilience">
+    Fallback across regions for high availability:
+    
+    ```typescript
+    const response = await client.chat.completions.create({
+      model: "us.anthropic.claude-3-7-sonnet-20250219-v1:0/bedrock,eu.anthropic.claude-3-7-sonnet-20250219-v1:0/bedrock,claude-3-7-sonnet-20250219/anthropic",
+      messages: [{ role: "user", content: "Hello!" }],
+    });
+    ```
+    
+    **Pattern:**
+    1. US region Bedrock
+    2. EU region Bedrock
+    3. Anthropic global
+  </Tab>
+
+  <Tab title="Speed Optimization">
+    Try fastest providers first:
+    
+    ```typescript
+    const response = await client.chat.completions.create({
+      model: "llama-3.3-70b/groq,llama-3.3-70b/deepinfra,llama-3.3-70b/together",
+      messages: [{ role: "user", content: "Hello!" }],
+    });
+    ```
+    
+    **Pattern:**
+    1. Groq (fastest inference)
+    2. DeepInfra (fast, cheaper)
+    3. Together AI (reliable)
+  </Tab>
+
+  <Tab title="BYOK + PTB">
+    Fallback from BYOK to PTB automatically:
+    
+    ```typescript
+    // With OpenAI BYOK key configured
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: "Hello!" }],
+    });
+    ```
+    
+    **Automatic pattern:**
+    1. OpenAI BYOK (your key)
+    2. OpenAI PTB (Helicone billing)
+    3. Alternative providers PTB
+  </Tab>
+</Tabs>
+
+## Failure Scenarios
+
+The gateway automatically retries on these failure types:
+
+<AccordionGroup>
+  <Accordion title="Rate Limiting (429)" icon="gauge-high">
+    **Provider rate limit exceeded**
+    
+    ```typescript
+    model: "gpt-4o/openai,gpt-4o/azure"
+    // If OpenAI returns 429, immediately tries Azure
+    ```
+    
+    <Note>
+    **Exception**: Helicone-generated 429s (escrow failure, rate limits) bail immediately without trying fallbacks.
+    </Note>
+  </Accordion>
+
+  <Accordion title="Authentication Errors (401, 403)" icon="key">
+    **Invalid or expired provider keys**
+    
+    ```typescript
+    model: "gpt-4o/openai,gpt-4o/azure"
+    // If OpenAI BYOK key is invalid, tries Azure
+    ```
+  </Accordion>
+
+  <Accordion title="Service Errors (500, 502, 503)" icon="server">
+    **Provider service unavailable**
+    
+    ```typescript
+    model: "claude-sonnet-4/anthropic,claude-sonnet-4/bedrock"
+    // If Anthropic is down, tries Bedrock
+    ```
+  </Accordion>
+
+  <Accordion title="Timeout Errors" icon="clock">
+    **Request timeout**
+    
+    ```typescript
+    model: "llama-3.3-70b/groq,llama-3.3-70b/together"
+    // If Groq times out, tries Together AI
+    ```
+  </Accordion>
+
+  <Accordion title="Disallowed Models" icon="ban">
+    **Model not available for PTB**
+    
+    ```typescript
+    model: "special-model/bedrock,gpt-4o"
+    // If model is disallowed for PTB, tries next option
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Fallback Strategies
+
+### Multi-Model Fallback
+
+Combine multiple models and providers:
+
+```typescript
+const response = await client.chat.completions.create({
+  model: [
+    "gpt-4o/openai",           // Primary: GPT-4o on OpenAI
+    "gpt-4o/azure",            // Fallback 1: GPT-4o on Azure
+    "claude-sonnet-4/anthropic", // Fallback 2: Claude on Anthropic
+    "gemini-2.0-flash/google-ai-studio", // Fallback 3: Gemini
+  ].join(","),
+  messages: [{ role: "user", content: "Hello!" }],
+});
+```
+
+### Conditional Fallbacks
+
+Choose fallback strategy based on context:
+
+```typescript
+function getFallbackModel(priority: "cost" | "speed" | "reliability") {
+  const strategies = {
+    cost: "gpt-4o-mini/deepinfra,gpt-4o-mini,claude-3-haiku",
+    speed: "llama-3.3-70b/groq,gpt-4o-mini/openai,gemini-2.0-flash",
+    reliability: "gpt-4o/openai,gpt-4o/azure,claude-sonnet-4/anthropic,gemini-2.0-flash/vertex",
+  };
+  return strategies[priority];
+}
+
+const response = await client.chat.completions.create({
+  model: getFallbackModel("reliability"),
+  messages: [{ role: "user", content: "Hello!" }],
+});
+```
+
+### Provider Exclusions with Fallbacks
+
+Exclude specific providers while maintaining fallbacks:
+
+```typescript
+const response = await client.chat.completions.create({
+  model: "!deepinfra,gpt-4o/openai,gpt-4o/azure",
+  messages: [{ role: "user", content: "Hello!" }],
+});
+// Tries OpenAI and Azure, but never DeepInfra
+```
+
+## Monitoring Fallbacks
+
+Track fallback behavior in the Helicone dashboard:
+
+<Steps>
+  <Step title="View Request Details">
+    Open any request in [Requests](https://helicone.ai/requests)
+  </Step>
+
+  <Step title="Check Attempts">
+    See all provider attempts and which one succeeded
+  </Step>
+
+  <Step title="Analyze Patterns">
+    - Which providers fail most often?
+    - How many fallback attempts typically occur?
+    - What's the success rate by provider?
+  </Step>
+</Steps>
+
+## Error Responses
+
+When all fallback attempts fail, the gateway returns a consolidated error:
+
+```json
+{
+  "error": {
+    "message": "All fallback attempts failed",
+    "type": "all_attempts_failed",
+    "attempts": [
+      {
+        "source": "gpt-4o/openai",
+        "error": "Rate limit exceeded",
+        "status": 429
+      },
+      {
+        "source": "gpt-4o/azure",
+        "error": "Service unavailable",
+        "status": 503
+      }
+    ]
+  }
+}
+```
+
+<Warning>
+**Helicone 429s bail immediately:**
+
+If Helicone returns a 429 (insufficient credits or rate limit), the request fails immediately without trying fallbacks. Add credits at [helicone.ai/credits](https://us.helicone.ai/credits).
+</Warning>
+
+## Fallback Best Practices
+
+<AccordionGroup>
+  <Accordion title="Start with Native Providers" icon="star">
+    List the native provider first for best compatibility:
+    
+    ```typescript
+    // Good: Native provider first
+    model: "gpt-4o/openai,gpt-4o/azure,gpt-4o/deepinfra"
+    
+    // Avoid: Non-native provider first
+    model: "gpt-4o/deepinfra,gpt-4o/openai"
+    ```
+  </Accordion>
+
+  <Accordion title="Balance Cost and Reliability" icon="scale-balanced">
+    Mix low-cost and reliable providers:
+    
+    ```typescript
+    model: "gpt-4o-mini/deepinfra,gpt-4o-mini/openai,gpt-4o"
+    // Try cheap first, fallback to reliable
+    ```
+  </Accordion>
+
+  <Accordion title="Keep Fallback Chains Short" icon="link">
+    2-4 fallbacks is usually sufficient:
+    
+    ```typescript
+    // Good: 3 fallbacks
+    model: "gpt-4o/openai,gpt-4o/azure,claude-sonnet-4"
+    
+    // Too many: 7+ fallbacks may cause latency
+    model: "model1,model2,model3,model4,model5,model6,model7"
+    ```
+  </Accordion>
+
+  <Accordion title="Monitor Fallback Frequency" icon="chart-line">
+    If fallbacks trigger frequently:
+    - Check provider status
+    - Verify BYOK keys
+    - Consider changing primary provider
+    - Review rate limits
+    
+    Monitor at [Helicone Dashboard](https://helicone.ai/dashboard)
+  </Accordion>
+
+  <Accordion title="Test Your Fallback Strategy" icon="flask">
+    Test fallbacks by:
+    1. Using invalid BYOK keys temporarily
+    2. Requesting rate-limited models
+    3. Monitoring which providers succeed
+  </Accordion>
+</AccordionGroup>
+
+## Real-World Examples
+
+### Production-Grade Fallback
+
+```typescript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  baseURL: "https://ai-gateway.helicone.ai",
+  apiKey: process.env.HELICONE_API_KEY,
+});
+
+async function robustCompletion(prompt: string) {
+  try {
+    const response = await client.chat.completions.create({
+      model: "gpt-4o/openai,gpt-4o/azure,claude-sonnet-4/anthropic,gemini-2.0-flash/vertex",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 1000,
+    });
+    return response.choices[0].message.content;
+  } catch (error) {
+    // All fallbacks failed
+    console.error("All providers failed:", error);
+    throw error;
+  }
+}
+```
+
+### Cost-Optimized with Fallback
+
+```typescript
+async function costOptimizedCompletion(prompt: string, budget: "low" | "high") {
+  const models = {
+    low: "gpt-4o-mini/deepinfra,gpt-4o-mini/openai",
+    high: "gpt-4o/openai,claude-sonnet-4/anthropic",
+  };
+
+  const response = await client.chat.completions.create({
+    model: models[budget],
+    messages: [{ role: "user", content: prompt }],
+  });
+  
+  return response.choices[0].message.content;
+}
+```
+
+### Regional Resilience
+
+```typescript
+async function regionalCompletion(prompt: string, preferredRegion: "us" | "eu") {
+  const models = {
+    us: "us.anthropic.claude-3-7-sonnet-20250219-v1:0/bedrock,claude-3-7-sonnet-20250219/anthropic",
+    eu: "eu.anthropic.claude-3-7-sonnet-20250219-v1:0/bedrock,claude-3-7-sonnet-20250219/anthropic",
+  };
+
+  const response = await client.chat.completions.create({
+    model: models[preferredRegion],
+    messages: [{ role: "user", content: prompt }],
+  });
+  
+  return response.choices[0].message.content;
+}
+```
+
+## Streaming with Fallbacks
+
+Fallbacks work seamlessly with streaming:
+
+```typescript
+const stream = await client.chat.completions.create({
+  model: "gpt-4o/openai,gpt-4o/azure,claude-sonnet-4/anthropic",
+  messages: [{ role: "user", content: "Tell me a story" }],
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0]?.delta?.content || "");
+}
+```
+
+If the first provider fails, the stream automatically switches to the next provider.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Routing" icon="route" href="/gateway/routing">
+    Learn more about provider routing
+  </Card>
+  <Card title="Getting Started" icon="rocket" href="/gateway/getting-started">
+    Set up the AI Gateway
+  </Card>
+  <Card title="Monitor Requests" icon="chart-line" href="https://helicone.ai/dashboard">
+    Track fallback behavior
+  </Card>
+  <Card title="Browse Models" icon="grid" href="https://www.helicone.ai/models">
+    Explore available models
+  </Card>
+</CardGroup>

@@ -1,0 +1,479 @@
+---
+title: 'OpenAI Integration'
+description: 'Integrate Helicone with OpenAI for monitoring and observability'
+icon: 'brain'
+---
+
+Helicone provides multiple ways to integrate with OpenAI, from simple proxy routing to zero-latency async logging.
+
+## Integration Methods
+
+<CardGroup cols={2}>
+  <Card title="Proxy Integration" icon="shuffle">
+    Route requests through Helicone's proxy. Simple setup with minimal code changes.
+  </Card>
+  <Card title="AI Gateway" icon="network-wired" href="/gateway/overview">
+    Use the AI Gateway for access to multiple providers including OpenAI.
+  </Card>
+  <Card title="Async Logging" icon="bolt" href="/integrations/async-logging">
+    Zero-latency logging using OpenLLMetry. No proxy required.
+  </Card>
+  <Card title="Azure OpenAI" icon="microsoft">
+    Special integration for Azure-hosted OpenAI models.
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+<Steps>
+  <Step title="Get your API keys">
+    You'll need:
+    - Your OpenAI API key from [platform.openai.com](https://platform.openai.com/api-keys)
+    - Your Helicone API key from [helicone.ai/developer](https://helicone.ai/developer)
+  </Step>
+  
+  <Step title="Update your base URL">
+    Change the base URL to route requests through Helicone:
+    
+    <Tabs>
+      <Tab title="TypeScript/JavaScript">
+        ```typescript
+        import { OpenAI } from "openai";
+
+        const client = new OpenAI({
+          baseURL: "https://oai.helicone.ai/v1",
+          apiKey: process.env.OPENAI_API_KEY,
+          defaultHeaders: {
+            "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+          },
+        });
+        ```
+      </Tab>
+      
+      <Tab title="Python">
+        ```python
+        from openai import OpenAI
+        import os
+
+        client = OpenAI(
+            base_url="https://oai.helicone.ai/v1",
+            api_key=os.getenv("OPENAI_API_KEY"),
+            default_headers={
+                "Helicone-Auth": f"Bearer {os.getenv('HELICONE_API_KEY')}"
+            }
+        )
+        ```
+      </Tab>
+      
+      <Tab title="cURL">
+        ```bash
+        curl https://oai.helicone.ai/v1/chat/completions \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $OPENAI_API_KEY" \
+          -H "Helicone-Auth: Bearer $HELICONE_API_KEY" \
+          -d '{
+            "model": "gpt-4o-mini",
+            "messages": [{"role": "user", "content": "Hello!"}]
+          }'
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+  
+  <Step title="Make requests as usual">
+    Use the OpenAI SDK normally:
+    
+    ```typescript
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You are a helpful assistant." },
+        { role: "user", content: "What is the capital of France?" },
+      ],
+    });
+
+    console.log(response.choices[0].message.content);
+    ```
+  </Step>
+  
+  <Step title="View your logs">
+    All requests are now logged to your [Helicone dashboard](https://us.helicone.ai/dashboard).
+  </Step>
+</Steps>
+
+## Streaming Support
+
+Helicone fully supports OpenAI streaming:
+
+<Tabs>
+  <Tab title="TypeScript/JavaScript">
+    ```typescript
+    const stream = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: "Write a poem" }],
+      stream: true,
+    });
+
+    for await (const chunk of stream) {
+      process.stdout.write(chunk.choices[0]?.delta?.content || "");
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    stream = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": "Write a poem"}],
+        stream=True
+    )
+
+    for chunk in stream:
+        if chunk.choices[0].delta.content:
+            print(chunk.choices[0].delta.content, end="")
+    ```
+  </Tab>
+</Tabs>
+
+## Custom Properties
+
+Track custom metadata with your requests:
+
+```typescript
+const response = await client.chat.completions.create(
+  {
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Hello!" }],
+  },
+  {
+    headers: {
+      "Helicone-User-Id": "user-123",
+      "Helicone-Session-Id": "session-456",
+      "Helicone-Property-Environment": "production",
+      "Helicone-Property-App": "chatbot",
+    },
+  }
+);
+```
+
+## Session Tracking
+
+Track multi-turn conversations and agent workflows:
+
+```typescript
+import { v4 as uuidv4 } from "uuid";
+
+const sessionId = uuidv4();
+
+// First request
+await client.chat.completions.create(
+  {
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Hello!" }],
+  },
+  {
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Path": "/chat/greeting",
+      "Helicone-Session-Name": "Customer Chat",
+    },
+  }
+);
+
+// Follow-up request in same session
+await client.chat.completions.create(
+  {
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "user", content: "Hello!" },
+      { role: "assistant", content: "Hi! How can I help?" },
+      { role: "user", content: "Tell me about your services" },
+    ],
+  },
+  {
+    headers: {
+      "Helicone-Session-Id": sessionId,
+      "Helicone-Session-Path": "/chat/services",
+    },
+  }
+);
+```
+
+Learn more about [Session Tracking](/observability/sessions).
+
+## Response Caching
+
+Reduce costs and latency with response caching:
+
+```typescript
+const response = await client.chat.completions.create(
+  {
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "What is 2+2?" }],
+  },
+  {
+    headers: {
+      "Helicone-Cache-Enabled": "true",
+    },
+  }
+);
+
+// Subsequent identical requests return cached responses
+```
+
+Learn more about [Response Caching](/features/caching).
+
+## Rate Limiting
+
+Control usage per user or API key:
+
+```typescript
+const response = await client.chat.completions.create(
+  {
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Hello!" }],
+  },
+  {
+    headers: {
+      "Helicone-RateLimit-Policy": "100;w=60;s=user", // 100 requests per 60 seconds per user
+      "Helicone-User-Id": "user-123",
+    },
+  }
+);
+```
+
+Learn more about [Rate Limiting](/features/rate-limiting).
+
+## Function Calling
+
+Helicone fully supports OpenAI function calling:
+
+```typescript
+const response = await client.chat.completions.create({
+  model: "gpt-4o-mini",
+  messages: [{ role: "user", content: "What's the weather in Paris?" }],
+  tools: [
+    {
+      type: "function",
+      function: {
+        name: "get_weather",
+        description: "Get the current weather for a location",
+        parameters: {
+          type: "object",
+          properties: {
+            location: {
+              type: "string",
+              description: "The city name",
+            },
+          },
+          required: ["location"],
+        },
+      },
+    },
+  ],
+});
+
+// Function calls are logged with full details
+console.log(response.choices[0].message.tool_calls);
+```
+
+## Vision Models
+
+Use GPT-4 Vision with Helicone:
+
+```typescript
+const response = await client.chat.completions.create({
+  model: "gpt-4o",
+  messages: [
+    {
+      role: "user",
+      content: [
+        { type: "text", text: "What's in this image?" },
+        {
+          type: "image_url",
+          image_url: {
+            url: "https://example.com/image.jpg",
+          },
+        },
+      ],
+    },
+  ],
+});
+```
+
+## Embeddings
+
+Track embedding requests:
+
+```typescript
+const embedding = await client.embeddings.create(
+  {
+    model: "text-embedding-3-small",
+    input: "The quick brown fox jumps over the lazy dog",
+  },
+  {
+    headers: {
+      "Helicone-Property-Purpose": "document-indexing",
+    },
+  }
+);
+```
+
+## Azure OpenAI
+
+Integrate with Azure-hosted OpenAI:
+
+```typescript
+import { AzureOpenAI } from "openai";
+
+const client = new AzureOpenAI({
+  baseURL: "https://azure.helicone.ai",
+  apiKey: process.env.AZURE_OPENAI_API_KEY,
+  defaultHeaders: {
+    "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+    "Helicone-Azure-Base-Url": process.env.AZURE_OPENAI_ENDPOINT,
+  },
+  apiVersion: "2024-02-01",
+});
+
+const response = await client.chat.completions.create({
+  model: "gpt-4", // Your Azure deployment name
+  messages: [{ role: "user", content: "Hello!" }],
+});
+```
+
+## Error Tracking
+
+Helicone automatically tracks errors and retry attempts:
+
+```typescript
+try {
+  const response = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "Hello!" }],
+  });
+} catch (error) {
+  // Error is logged to Helicone with full context
+  console.error("Request failed:", error);
+}
+```
+
+View errors in your dashboard with:
+- Error message and type
+- Request parameters
+- Retry attempts
+- User and session context
+
+## Zero-Latency Integration
+
+For production applications where latency is critical, use async logging:
+
+```typescript
+import { HeliconeAsyncLogger } from "@helicone/async";
+import OpenAI from "openai";
+
+const logger = new HeliconeAsyncLogger({
+  apiKey: process.env.HELICONE_API_KEY,
+  providers: { openAI: OpenAI },
+});
+logger.init();
+
+// Use OpenAI SDK normally - no proxy latency
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const response = await client.chat.completions.create({
+  model: "gpt-4o-mini",
+  messages: [{ role: "user", content: "Hello!" }],
+});
+```
+
+Learn more about [Async Logging](/integrations/async-logging).
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use environment variables for API keys">
+    Never hardcode API keys. Use environment variables:
+    
+    ```bash
+    # .env
+    OPENAI_API_KEY=sk-...
+    HELICONE_API_KEY=sk-helicone-...
+    ```
+  </Accordion>
+  
+  <Accordion title="Track users and sessions">
+    Always include user and session IDs for better observability:
+    
+    ```typescript
+    headers: {
+      "Helicone-User-Id": userId,
+      "Helicone-Session-Id": sessionId,
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Use custom properties">
+    Add context with custom properties:
+    
+    ```typescript
+    headers: {
+      "Helicone-Property-Environment": "production",
+      "Helicone-Property-Feature": "chatbot",
+      "Helicone-Property-Version": "v1.2.3",
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Enable caching for repeated queries">
+    Reduce costs with caching:
+    
+    ```typescript
+    headers: {
+      "Helicone-Cache-Enabled": "true",
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Requests not showing in dashboard">
+    1. Verify your Helicone API key is correct
+    2. Check that the `Helicone-Auth` header is formatted correctly: `Bearer sk-helicone-...`
+    3. Ensure you're using the correct base URL: `https://oai.helicone.ai/v1`
+    4. Check your network allows connections to helicone.ai
+  </Accordion>
+  
+  <Accordion title="Authentication errors">
+    - Make sure you're passing your OpenAI API key (not Helicone key) as the `apiKey`
+    - Pass your Helicone API key in the `Helicone-Auth` header
+    - Format: `Helicone-Auth: Bearer sk-helicone-...`
+  </Accordion>
+  
+  <Accordion title="Increased latency">
+    - Helicone proxy adds ~20-50ms latency
+    - For zero-latency, use [async logging](/integrations/async-logging)
+    - Check your geographic region - we have global endpoints
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Session Tracking" icon="diagram-project" href="/observability/sessions">
+    Track multi-turn conversations
+  </Card>
+  <Card title="Custom Properties" icon="tag" href="/features/custom-properties">
+    Add custom metadata
+  </Card>
+  <Card title="Response Caching" icon="database" href="/features/caching">
+    Reduce costs with caching
+  </Card>
+  <Card title="Prompt Management" icon="file-code" href="/prompts/overview">
+    Version and deploy prompts
+  </Card>
+</CardGroup>

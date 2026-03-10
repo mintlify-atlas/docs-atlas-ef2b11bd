@@ -1,0 +1,300 @@
+---
+title: "Prompt Versioning"
+description: "Create, manage, and track prompt versions with semantic versioning and commit history"
+icon: "code-branch"
+---
+
+Helicone uses semantic versioning for prompts, allowing you to track changes, rollback when needed, and maintain multiple versions simultaneously.
+
+## Versioning System
+
+Prompt versions follow a **major.minor** format:
+
+- **Major version** (e.g., 1.0 → 2.0): Significant changes, restructuring, or breaking changes
+- **Minor version** (e.g., 1.0 → 1.1): Incremental improvements, tweaks, or additions
+
+Each version is immutable and includes:
+- Version number (major.minor)
+- Commit message
+- Complete prompt configuration (messages, parameters, tools)
+- Creation timestamp
+- S3 storage URL for the prompt body
+
+## Creating Versions in the UI
+
+### Initial Version
+
+When you create a new prompt, the first version (1.0) is automatically created.
+
+<Steps>
+  <Step title="Navigate to Prompts">
+    Go to the **Prompts** page in your Helicone dashboard.
+  </Step>
+  
+  <Step title="Create New Prompt">
+    Click **New Prompt** and configure:
+    - Prompt name
+    - Tags for organization
+    - Initial messages
+    - Variables (optional)
+    - Model parameters
+    - Tools (optional)
+  </Step>
+  
+  <Step title="Save">
+    Click **Create** to save version 1.0 of your prompt.
+  </Step>
+</Steps>
+
+### Creating New Versions
+
+To create a new version from an existing prompt:
+
+<Steps>
+  <Step title="Open the prompt">
+    Navigate to your prompt in the dashboard.
+  </Step>
+  
+  <Step title="Edit the prompt">
+    Make changes to messages, parameters, tools, or variables.
+  </Step>
+  
+  <Step title="Choose version type">
+    Select whether this is a:
+    - **Minor version**: Incremental change (1.0 → 1.1)
+    - **Major version**: Significant change (1.0 → 2.0)
+  </Step>
+  
+  <Step title="Add commit message">
+    Write a descriptive commit message explaining the changes:
+    ```
+    Improve system prompt clarity and reduce token usage
+    ```
+  </Step>
+  
+  <Step title="Save Version">
+    Click **Save Version** to create the new immutable version.
+  </Step>
+</Steps>
+
+## Accessing Versions via SDK
+
+The `@helicone/prompts` SDK provides multiple ways to fetch specific versions:
+
+### Production Version
+
+Fetch the version deployed to production:
+
+```typescript
+import { HeliconePromptManager } from "@helicone/prompts";
+
+const promptManager = new HeliconePromptManager({
+  apiKey: process.env.HELICONE_API_KEY!,
+});
+
+// Fetches the production version (default behavior)
+const { body } = await promptManager.getPromptBody({
+  prompt_id: "abc123",
+  inputs: { userName: "Alice" },
+});
+```
+
+### Specific Version ID
+
+Fetch a specific version by its ID:
+
+```typescript
+const { body } = await promptManager.getPromptBody({
+  prompt_id: "abc123",
+  version_id: "5d4ec7d7-5725-46c2-ad26-41ddf6287527",
+  inputs: { userName: "Alice" },
+});
+```
+
+### Environment-Specific Version
+
+Fetch the version deployed to a specific environment:
+
+```typescript
+const { body } = await promptManager.getPromptBody({
+  prompt_id: "abc123",
+  environment: "staging",
+  inputs: { userName: "Alice" },
+});
+```
+
+## Version Metadata
+
+Each version contains complete metadata:
+
+```typescript
+interface Prompt2025Version {
+  id: string;                    // Version UUID
+  prompt_id: string;             // Parent prompt ID
+  major_version: number;         // Major version number
+  minor_version: number;         // Minor version number
+  commit_message: string;        // Commit description
+  environments?: string[];       // Deployed environments
+  created_at: string;           // ISO timestamp
+  model: string;                // Model name
+  s3_url?: string;              // Storage URL
+  prompt_body?: {
+    messages: Array<{
+      role: string;
+      content: string;
+    }>;
+    temperature?: number;
+    max_tokens?: number;
+    tools?: Array<any>;
+    // ... other parameters
+  };
+}
+```
+
+## Querying Versions via API
+
+### Get All Versions for a Prompt
+
+```bash
+curl -X POST https://api.helicone.ai/v1/prompt-2025/query/versions \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "promptId": "abc123"
+  }'
+```
+
+### Get Versions for a Major Version
+
+```bash
+curl -X POST https://api.helicone.ai/v1/prompt-2025/query/versions \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "promptId": "abc123",
+    "majorVersion": 1
+  }'
+```
+
+### Get Production Version
+
+```bash
+curl -X POST https://api.helicone.ai/v1/prompt-2025/query/production-version \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "promptId": "abc123"
+  }'
+```
+
+### Get Version Counts
+
+```bash
+curl -X POST https://api.helicone.ai/v1/prompt-2025/query/total-versions \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "promptId": "abc123"
+  }'
+```
+
+Response:
+```json
+{
+  "data": {
+    "totalVersions": 15,
+    "majorVersions": 3
+  }
+}
+```
+
+## Version History
+
+View the complete version history in the UI:
+
+1. Open your prompt in the dashboard
+2. Navigate to the **Versions** tab
+3. See all versions with:
+   - Version number
+   - Commit message
+   - Creation date
+   - Deployed environments
+   - Creator information
+
+## Best Practices
+
+### Commit Messages
+
+Write clear, descriptive commit messages:
+
+<Check>**Good**: "Add context about user preferences to improve personalization"</Check>
+<Warning>**Avoid**: "Update prompt" or "Fix"</Warning>
+
+### Major vs Minor Versions
+
+Use major versions for:
+- Complete prompt rewrites
+- Changing the message structure (adding/removing roles)
+- Switching models or fundamentally changing behavior
+- Breaking changes to variable names or types
+
+Use minor versions for:
+- Wording improvements
+- Parameter adjustments (temperature, max_tokens)
+- Adding optional variables
+- Bug fixes or clarifications
+
+### Version Testing
+
+Before promoting a version to production:
+1. Test in a `staging` or `dev` environment
+2. Run experiments to compare against current production
+3. Monitor metrics and user feedback
+4. Gradually rollout using environment-based deployment
+
+### Rollback Strategy
+
+If a new version underperforms:
+1. Identify the issue in the dashboard metrics
+2. Redeploy a previous stable version to production
+3. No code changes required - instant rollback
+
+## Deleting Versions
+
+<Warning>
+Deleting versions is permanent and cannot be undone. Only delete versions that were never deployed to production.
+</Warning>
+
+### Via API
+
+```bash
+curl -X DELETE https://api.helicone.ai/v1/prompt-2025/{promptId}/{versionId} \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+### Via UI
+
+1. Open the prompt
+2. Navigate to **Versions**
+3. Find the version to delete
+4. Click the delete icon
+5. Confirm deletion
+
+## Version Storage
+
+Prompt bodies are stored in S3 for reliability and fast access:
+- Each version has a unique S3 URL
+- Prompt bodies are immutable
+- The SDK automatically fetches from S3 when needed
+- Cached for performance
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deployment" icon="rocket" href="/prompts/deployment">
+    Deploy versions to different environments
+  </Card>
+  <Card title="Experiments" icon="flask" href="/prompts/experiments">
+    Compare versions with A/B testing
+  </Card>
+</CardGroup>

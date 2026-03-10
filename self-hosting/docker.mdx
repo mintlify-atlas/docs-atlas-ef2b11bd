@@ -1,0 +1,401 @@
+---
+title: 'Docker Deployment'
+description: 'Deploy Helicone with Docker and Docker Compose'
+icon: 'docker'
+---
+
+## Overview
+
+Helicone provides two Docker deployment options:
+
+1. **All-in-One Container** - Single container with all services (fastest setup)
+2. **Docker Compose** - Multi-container setup with separate services (recommended)
+
+## All-in-One Container
+
+The simplest way to run Helicone. All services run in a single container using supervisord.
+
+### Quick Start
+
+```bash
+# Pull the latest image
+docker pull helicone/helicone-all-in-one:latest
+
+# Run the container
+docker run -d \
+  --name helicone \
+  -p 3000:3000 \
+  -p 8585:8585 \
+  -p 9080:9080 \
+  helicone/helicone-all-in-one:latest
+```
+
+### Exposed Ports
+
+| Port | Service | Description |
+|------|---------|-------------|
+| `3000` | Web Dashboard | Access the Helicone UI |
+| `8585` | Jawn API + Proxy | Backend API and LLM request proxy |
+| `9080` | MinIO S3 | Object storage for request/response bodies |
+
+### Access the Dashboard
+
+Once running, open [http://localhost:3000](http://localhost:3000) in your browser.
+
+<Tip>
+The all-in-one image includes PostgreSQL, ClickHouse, MinIO, Jawn, and Web - all running in a single container.
+</Tip>
+
+## Docker Compose (Recommended)
+
+For production deployments or development, use Docker Compose to run services in separate containers.
+
+### Prerequisites
+
+- Docker 20.10 or later
+- Docker Compose v2.0 or later
+- 4GB+ RAM available
+- 20GB+ disk space
+
+### Installation
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/Helicone/helicone.git
+    cd helicone/docker
+    ```
+  </Step>
+  
+  <Step title="Configure environment variables">
+    ```bash
+    cp .env.example .env
+    ```
+    
+    Edit `.env` to customize your deployment. Key variables:
+    
+    ```bash
+    # Security (CHANGE THESE IN PRODUCTION!)
+    BETTER_AUTH_SECRET="your-secret-key-here"
+    POSTGRES_PASSWORD="your-postgres-password"
+    
+    # Service URLs
+    JAWN_PORT=8585
+    JAWN_PUBLIC_URL=http://localhost:8585
+    
+    # MinIO S3 Storage
+    S3_ACCESS_KEY="minioadmin"
+    S3_SECRET_KEY="minioadmin"
+    ```
+  </Step>
+  
+  <Step title="Start Helicone services">
+    Use the helper script to manage different deployment profiles:
+    
+    ```bash
+    # Start full Helicone stack (recommended)
+    ./helicone-compose.sh helicone up
+    
+    # Or start infrastructure only
+    ./helicone-compose.sh infra up
+    
+    # Or start development mode with hot reload
+    ./helicone-compose.sh dev up
+    ```
+  </Step>
+  
+  <Step title="Create your first user">
+    Navigate to [http://localhost:54323/project/default/auth/users](http://localhost:54323/project/default/auth/users)
+    
+    Add a user account with your email and password.
+  </Step>
+  
+  <Step title="Access Helicone">
+    Open [http://localhost:3000](http://localhost:3000) and log in with the account you created.
+  </Step>
+</Steps>
+
+## Docker Compose Profiles
+
+The `helicone-compose.sh` script supports multiple deployment profiles:
+
+| Profile | Services | Use Case |
+|---------|----------|----------|
+| `infra` | PostgreSQL, ClickHouse, MinIO, Redis | Infrastructure only |
+| `helicone` | Infrastructure + Jawn + Web | Full stack (production) |
+| `dev` | Infrastructure + Jawn-dev + Web-dev | Development with hot reload |
+| `workers` | Infrastructure + Worker services | Add proxy workers |
+| `kafka` | Infrastructure + Kafka + Zookeeper | Event streaming (experimental) |
+| `all` | All services | Everything enabled |
+
+### Examples
+
+```bash
+# Production setup
+./helicone-compose.sh helicone up
+
+# Development with hot reload
+./helicone-compose.sh dev up
+
+# Infrastructure + Workers
+./helicone-compose.sh workers up
+
+# View logs
+./helicone-compose.sh helicone logs -f jawn
+
+# Stop services
+./helicone-compose.sh helicone down
+```
+
+## Service Architecture
+
+The docker-compose setup includes these services:
+
+### Infrastructure Services (Always Running)
+
+```yaml
+services:
+  db:                    # PostgreSQL 17 - Application database
+  clickhouse:            # ClickHouse - Analytics database
+  minio:                 # MinIO - S3-compatible object storage
+  redis:                 # Redis - Caching and rate limiting
+  mailhog:               # MailHog - Email testing
+  migrations:            # Database migration runner
+```
+
+### Helicone Services
+
+```yaml
+services:
+  jawn:                  # Backend API (Express + TypeScript)
+  web:                   # Frontend dashboard (Next.js)
+```
+
+### Worker Services (Optional)
+
+```yaml
+services:
+  worker-openai-proxy:   # OpenAI proxy worker (port 8787)
+  worker-helicone-api:   # Helicone API worker (port 8788)
+  worker-gateway-api:    # Gateway API worker (port 8789)
+  worker-anthropic-proxy: # Anthropic proxy worker (port 8790)
+```
+
+## Environment Variables Reference
+
+### Required
+
+```bash
+# Authentication
+BETTER_AUTH_SECRET="random-secret-at-least-32-chars"
+
+# Database
+POSTGRES_PASSWORD="secure-password"
+POSTGRES_DB="helicone_test"
+
+# Jawn Service
+JAWN_PORT=8585
+JAWN_PUBLIC_URL=http://localhost:8585
+```
+
+### Optional
+
+```bash
+# ClickHouse
+CLICKHOUSE_HOST=http://clickhouse:8123
+CLICKHOUSE_USER=default
+CLICKHOUSE_PASSWORD=
+
+# MinIO Object Storage
+S3_ACCESS_KEY=minioadmin
+S3_SECRET_KEY=minioadmin
+S3_BUCKET_NAME=request-response-storage
+S3_PROMPT_BUCKET_NAME=prompt-body-storage
+
+# Redis
+REDIS_PASSWORD=helicone-redis-pw
+```
+
+## Accessing Services
+
+### Web Interfaces
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| Helicone Dashboard | http://localhost:3000 | Your created account |
+| MinIO Console | http://localhost:9001 | minioadmin / minioadmin |
+| MailHog | http://localhost:8025 | No auth |
+
+### API Endpoints
+
+| Service | URL | Purpose |
+|---------|-----|-------------|
+| Jawn API | http://localhost:8585 | Backend API |
+| OpenAI Proxy | http://localhost:8787 | OpenAI request proxy |
+| ClickHouse | http://localhost:18123 | Analytics database |
+| PostgreSQL | localhost:54388 | Application database |
+
+## Making Requests Through Your Proxy
+
+Once running, you can proxy LLM requests through your self-hosted instance:
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { OpenAI } from "openai";
+
+    const client = new OpenAI({
+      baseURL: "http://localhost:8787/v1",
+      apiKey: process.env.OPENAI_API_KEY, // Your actual OpenAI key
+      defaultHeaders: {
+        "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+      },
+    });
+
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: "Hello!" }],
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    from openai import OpenAI
+
+    client = OpenAI(
+        base_url="http://localhost:8787/v1",
+        api_key=os.getenv("OPENAI_API_KEY"),
+        default_headers={
+            "Helicone-Auth": f"Bearer {os.getenv('HELICONE_API_KEY')}"
+        }
+    )
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": "Hello!"}]
+    )
+    ```
+  </Tab>
+  
+  <Tab title="cURL">
+    ```bash
+    curl http://localhost:8787/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $OPENAI_API_KEY" \
+      -H "Helicone-Auth: Bearer $HELICONE_API_KEY" \
+      -d '{
+        "model": "gpt-4o-mini",
+        "messages": [{"role": "user", "content": "Hello!"}]
+      }'
+    ```
+  </Tab>
+</Tabs>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Services won't start">
+    Check Docker resources:
+    ```bash
+    # View service status
+    docker compose ps
+    
+    # Check logs for specific service
+    docker compose logs jawn
+    
+    # Ensure enough resources
+    docker system df
+    ```
+  </Accordion>
+  
+  <Accordion title="Database connection errors">
+    Wait for migrations to complete:
+    ```bash
+    # Check migration status
+    docker compose logs migrations
+    
+    # Restart Jawn after migrations complete
+    docker compose restart jawn
+    ```
+  </Accordion>
+  
+  <Accordion title="Port conflicts">
+    If ports are already in use, edit `.env` to change them:
+    ```bash
+    JAWN_PORT=9585  # Change from default 8585
+    ```
+    
+    Then restart:
+    ```bash
+    ./helicone-compose.sh helicone down
+    ./helicone-compose.sh helicone up
+    ```
+  </Accordion>
+  
+  <Accordion title="Can't log in / No users">
+    Create a user via Supabase auth:
+    1. Go to http://localhost:54323/project/default/auth/users
+    2. Click "Add User"
+    3. Enter email and password
+    4. Log in at http://localhost:3000
+  </Accordion>
+</AccordionGroup>
+
+## Updating
+
+To update to the latest version:
+
+```bash
+# Stop services
+./helicone-compose.sh helicone down
+
+# Pull latest code
+git pull origin main
+
+# Rebuild images
+docker compose build
+
+# Start services
+./helicone-compose.sh helicone up
+```
+
+## Production Considerations
+
+<Warning>
+**Before deploying to production:**
+
+1. Change all default passwords in `.env`
+2. Set `BETTER_AUTH_SECRET` to a secure random value
+3. Configure proper SSL/TLS certificates
+4. Set up backup strategies for PostgreSQL and ClickHouse
+5. Configure proper resource limits in docker-compose.yml
+6. Use external managed databases for better reliability
+</Warning>
+
+### Recommended Production Setup
+
+```bash
+# Use managed databases
+SUPABASE_DATABASE_URL=postgresql://user:pass@prod-postgres:5432/helicone
+CLICKHOUSE_HOST=https://prod-clickhouse:8443
+
+# Use external S3 (AWS, GCP, etc.)
+S3_ENDPOINT=https://s3.amazonaws.com
+S3_BUCKET_NAME=your-prod-bucket
+
+# Public URLs for web access
+JAWN_PUBLIC_URL=https://api.your-domain.com
+NEXT_PUBLIC_HELICONE_JAWN_SERVICE=https://api.your-domain.com
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/self-hosting/architecture">
+    Learn how services communicate
+  </Card>
+  <Card title="Kubernetes" icon="dharmachakra" href="/self-hosting/kubernetes">
+    Scale with Kubernetes
+  </Card>
+</CardGroup>

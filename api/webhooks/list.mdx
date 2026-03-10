@@ -1,0 +1,85 @@
+---
+title: "List Webhooks"
+sidebarTitle: "List Webhooks"
+description: "Retrieve all webhooks configured for your organization"
+openapi: get /v1/webhooks
+---
+
+This endpoint returns a list of all webhooks configured for your organization. Use this to audit your webhook configurations and retrieve webhook details including HMAC keys for signature verification.
+
+## Use Cases
+
+- Audit webhook configurations
+- Retrieve HMAC keys for signature verification
+- List active webhook destinations
+- Monitor webhook settings
+
+## Response
+
+Returns a Result object containing an array of webhook configurations.
+
+<ResponseField name="data" type="array">
+  Array of webhook objects
+  
+  <ResponseField name="data[].id" type="string">
+    Unique identifier for the webhook
+  </ResponseField>
+  
+  <ResponseField name="data[].created_at" type="string">
+    ISO 8601 timestamp when the webhook was created
+  </ResponseField>
+  
+  <ResponseField name="data[].destination" type="string">
+    The URL endpoint where webhook events will be sent
+  </ResponseField>
+  
+  <ResponseField name="data[].version" type="string">
+    Webhook API version (e.g., "2024-10-22")
+  </ResponseField>
+  
+  <ResponseField name="data[].config" type="string">
+    JSON string containing webhook configuration including sampleRate, propertyFilters, and includeData settings
+  </ResponseField>
+  
+  <ResponseField name="data[].hmac_key" type="string">
+    HMAC key used to sign webhook requests for verification
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="error" type="string | null">
+  Error message if the request failed, null otherwise
+</ResponseField>
+
+## Example Request
+
+```bash
+curl --request GET \
+  --url https://api.helicone.ai/v1/webhooks \
+  --header 'Authorization: Bearer <YOUR_API_KEY>'
+```
+
+## Example Response
+
+```json
+{
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "created_at": "2024-01-15T10:30:00Z",
+      "destination": "https://example.com/webhook",
+      "version": "2024-10-22",
+      "config": "{\"sampleRate\":100,\"propertyFilters\":[],\"includeData\":true}",
+      "hmac_key": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+    }
+  ],
+  "error": null
+}
+```
+
+## Configuration Object
+
+The `config` field contains a JSON string with the following properties:
+
+- `sampleRate`: Percentage of requests to send (0-100)
+- `propertyFilters`: Array of property filters to match specific requests
+- `includeData`: Whether to include full request/response data in webhook payload

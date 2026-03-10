@@ -1,0 +1,81 @@
+---
+title: "Create Evaluation"
+sidebarTitle: "Create Evaluation"
+description: "Create a new evaluation score for a specific request"
+openapi: post /v1/evals/{requestId}
+---
+
+This endpoint allows you to add an evaluation score to a specific request. Use this to track quality metrics, performance scores, or custom evaluation criteria for your LLM requests.
+
+## Use Cases
+
+- Add human feedback scores to requests
+- Record automated evaluation results
+- Track custom quality metrics
+- Build evaluation datasets for model improvements
+
+## Path Parameters
+
+<ParamField path="requestId" type="string" required>
+  The unique identifier of the request to evaluate. This is the Helicone request ID returned when logging requests.
+</ParamField>
+
+## Request Body
+
+<ParamField body="name" type="string" required>
+  Name of the evaluation metric (e.g., "accuracy", "relevance", "quality")
+</ParamField>
+
+<ParamField body="score" type="number" required>
+  Numerical score for the evaluation. Can be any number, but typically normalized to a range like 0-1 or 0-100.
+</ParamField>
+
+## Response
+
+Returns a Result object indicating success or failure.
+
+<ResponseField name="data" type="null">
+  Null on success
+</ResponseField>
+
+<ResponseField name="error" type="string | null">
+  Error message if the request failed, null on success
+</ResponseField>
+
+## Example Request
+
+```bash
+curl --request POST \
+  --url https://api.helicone.ai/v1/evals/550e8400-e29b-41d4-a716-446655440000 \
+  --header 'Authorization: Bearer <YOUR_API_KEY>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "name": "accuracy",
+    "score": 0.95
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "data": null,
+  "error": null
+}
+```
+
+## Error Response
+
+```json
+{
+  "data": null,
+  "error": "Request not found"
+}
+```
+
+## Best Practices
+
+- Use consistent evaluation metric names across your requests
+- Normalize scores to a standard range (e.g., 0-1)
+- Add evaluations soon after request completion for accurate tracking
+- Consider using multiple evaluation metrics to capture different quality dimensions

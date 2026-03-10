@@ -1,0 +1,168 @@
+---
+title: 'API Overview'
+description: 'Introduction to the Helicone REST API'
+---
+
+## Base URL
+
+The Helicone API is available at:
+
+```
+https://api.helicone.ai
+```
+
+All API endpoints are relative to this base URL.
+
+## API Structure
+
+The Helicone API follows RESTful conventions and is organized into versioned endpoints:
+
+- **v1** - Current stable API version
+  - `/v1/request` - Query and manage requests
+  - `/v1/api-keys` - Manage API keys and provider keys
+  - `/v1/webhooks` - Configure webhooks
+  - `/v1/models` - Access model information
+  - `/v1/evals` - Manage evaluations
+  - And more...
+
+## Request Format
+
+All requests to the Helicone API must:
+
+1. Use HTTPS
+2. Include proper authentication headers (see [Authentication](/api/authentication))
+3. Send JSON payloads for POST/PUT requests with `Content-Type: application/json`
+
+### Example Request
+
+```bash
+curl https://api.helicone.ai/v1/request/query \
+  -X POST \
+  -H "Authorization: Bearer YOUR_HELICONE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {},
+    "limit": 10,
+    "offset": 0,
+    "sort": {
+      "created_at": "desc"
+    }
+  }'
+```
+
+## Response Format
+
+API responses are returned as JSON with a consistent structure:
+
+### Success Response
+
+```json
+{
+  "data": [...],
+  "error": null
+}
+```
+
+### Error Response
+
+```json
+{
+  "data": null,
+  "error": "Error message describing what went wrong"
+}
+```
+
+### HTTP Status Codes
+
+| Status Code | Description |
+|-------------|-------------|
+| 200 | Success |
+| 201 | Created/Success for mutations |
+| 400 | Bad Request - Invalid parameters |
+| 401 | Unauthorized - Missing or invalid authentication |
+| 500 | Internal Server Error |
+
+## Pagination
+
+Many API endpoints support pagination using `offset` and `limit` parameters:
+
+```json
+{
+  "filter": {},
+  "offset": 0,
+  "limit": 10
+}
+```
+
+- **offset** - Number of records to skip (default: 0)
+- **limit** - Maximum number of records to return (default: 10)
+
+To retrieve the next page, increment the offset by the limit value:
+
+```json
+{
+  "offset": 10,
+  "limit": 10
+}
+```
+
+## Filtering and Sorting
+
+Query endpoints support flexible filtering and sorting:
+
+### Filter Structure
+
+```json
+{
+  "filter": {
+    "left": {
+      "request_response_rmt": {
+        "model": {
+          "equals": "gpt-4"
+        }
+      }
+    },
+    "operator": "and",
+    "right": {
+      "request_response_rmt": {
+        "status": {
+          "equals": 200
+        }
+      }
+    }
+  }
+}
+```
+
+### Sort Structure
+
+```json
+{
+  "sort": {
+    "created_at": "desc"
+  }
+}
+```
+
+## Rate Limits
+
+The Helicone API implements rate limiting to ensure fair usage:
+
+- Rate limits vary by endpoint and subscription tier
+- Rate limit information is included in response headers
+- When rate limited, you'll receive a 429 status code
+
+<Note>
+For specific rate limits on your account, check your organization settings or contact support.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    Learn how to authenticate API requests
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/introduction">
+    Explore detailed endpoint documentation
+  </Card>
+</CardGroup>

@@ -1,0 +1,393 @@
+---
+title: "Query Requests"
+api: "POST https://api.helicone.ai/v1/request/query"
+description: "Query and filter requests with advanced filtering and pagination"
+---
+
+Query requests from your Helicone account with powerful filtering, sorting, and pagination capabilities. This endpoint uses Postgres as the data source.
+
+<Note>
+  For better performance with large datasets, consider using the [Clickhouse Query endpoint](/api/requests/query-clickhouse).
+</Note>
+
+## Request Body
+
+<ParamField body="filter" type="RequestFilterNode" required>
+  Filter criteria for requests. Can be a simple filter object, a complex filter tree with `left`, `operator`, and `right` properties, or `"all"` to return all requests.
+  
+  Supported filter tables:
+  - `request_response_rmt` - Main request/response table
+  - `request` - Request-specific fields
+  - `response` - Response-specific fields  
+  - `feedback` - Feedback data
+  - `properties` - Custom properties
+  - `values` - Request values
+  - `sessions_request_response_rmt` - Session data
+  
+  Example simple filter:
+  ```json
+  {
+    "request_response_rmt": {
+      "request_created_at": {
+        "gte": "2024-01-01T00:00:00Z"
+      }
+    }
+  }
+  ```
+  
+  Example complex filter:
+  ```json
+  {
+    "left": {
+      "request_response_rmt": {
+        "model": { "equals": "gpt-4" }
+      }
+    },
+    "operator": "and",
+    "right": {
+      "request_response_rmt": {
+        "request_created_at": {
+          "gte": "2024-01-01T00:00:00Z"
+        }
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField body="offset" type="number" default="0">
+  Number of records to skip for pagination.
+</ParamField>
+
+<ParamField body="limit" type="number" default="10">
+  Maximum number of records to return (max 1000).
+</ParamField>
+
+<ParamField body="sort" type="object">
+  Sort order for results. Specify field and direction.
+  
+  Example:
+  ```json
+  {
+    "created_at": "desc"
+  }
+  ```
+</ParamField>
+
+<ParamField body="isCached" type="boolean">
+  Filter for cached requests only.
+</ParamField>
+
+<ParamField body="includeInputs" type="boolean">
+  Include input data in the response.
+</ParamField>
+
+<ParamField body="isPartOfExperiment" type="boolean">
+  Filter for requests that are part of an experiment.
+</ParamField>
+
+<ParamField body="isScored" type="boolean">
+  Filter for requests that have scores attached.
+</ParamField>
+
+## Response
+
+<ResponseField name="data" type="HeliconeRequest[]">
+  Array of request objects matching the query criteria.
+  
+  <Expandable title="HeliconeRequest object">
+    <ResponseField name="request_id" type="string">
+      Unique identifier for the request.
+    </ResponseField>
+    
+    <ResponseField name="request_created_at" type="string">
+      ISO 8601 timestamp of when the request was created.
+    </ResponseField>
+    
+    <ResponseField name="request_body" type="object">
+      The request payload sent to the LLM provider.
+    </ResponseField>
+    
+    <ResponseField name="request_path" type="string">
+      API endpoint path that was called.
+    </ResponseField>
+    
+    <ResponseField name="request_user_id" type="string | null">
+      User ID associated with the request (from Helicone-User-Id header).
+    </ResponseField>
+    
+    <ResponseField name="request_properties" type="object | null">
+      Custom properties attached to the request.
+    </ResponseField>
+    
+    <ResponseField name="request_model" type="string | null">
+      Model name from the request.
+    </ResponseField>
+    
+    <ResponseField name="response_id" type="string | null">
+      Unique identifier for the response.
+    </ResponseField>
+    
+    <ResponseField name="response_created_at" type="string | null">
+      ISO 8601 timestamp of when the response was created.
+    </ResponseField>
+    
+    <ResponseField name="response_body" type="object">
+      The response payload from the LLM provider.
+    </ResponseField>
+    
+    <ResponseField name="response_status" type="number">
+      HTTP status code of the response.
+    </ResponseField>
+    
+    <ResponseField name="response_model" type="string | null">
+      Model name from the response.
+    </ResponseField>
+    
+    <ResponseField name="model_override" type="string | null">
+      Model override specified via Helicone-Model-Override header.
+    </ResponseField>
+    
+    <ResponseField name="provider" type="string">
+      LLM provider (e.g., "OPENAI", "ANTHROPIC", "AZURE").
+    </ResponseField>
+    
+    <ResponseField name="delay_ms" type="number | null">
+      Latency in milliseconds.
+    </ResponseField>
+    
+    <ResponseField name="time_to_first_token" type="number | null">
+      Time to first token in milliseconds (for streaming requests).
+    </ResponseField>
+    
+    <ResponseField name="total_tokens" type="number | null">
+      Total tokens used (prompt + completion).
+    </ResponseField>
+    
+    <ResponseField name="prompt_tokens" type="number | null">
+      Number of tokens in the prompt.
+    </ResponseField>
+    
+    <ResponseField name="completion_tokens" type="number | null">
+      Number of tokens in the completion.
+    </ResponseField>
+    
+    <ResponseField name="reasoning_tokens" type="number | null">
+      Number of reasoning tokens (for models like o1).
+    </ResponseField>
+    
+    <ResponseField name="cost" type="number | null">
+      Cost of the request in USD.
+    </ResponseField>
+    
+    <ResponseField name="cache_enabled" type="boolean">
+      Whether caching was enabled for this request.
+    </ResponseField>
+    
+    <ResponseField name="cache_reference_id" type="string | null">
+      Cache reference ID if cached.
+    </ResponseField>
+    
+    <ResponseField name="scores" type="object | null">
+      Scores attached to this request.
+    </ResponseField>
+    
+    <ResponseField name="feedback_rating" type="boolean | null">
+      Feedback rating (true for positive, false for negative).
+    </ResponseField>
+    
+    <ResponseField name="properties" type="object">
+      Custom properties attached to the request.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="error" type="string | null">
+  Error message if the request failed.
+</ResponseField>
+
+## Examples
+
+### Basic Query
+
+Query all requests from the last 7 days:
+
+```bash cURL
+curl --request POST \
+  --url https://api.helicone.ai/v1/request/query \
+  --header 'Authorization: Bearer <HELICONE_API_KEY>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+  "filter": {
+    "request_response_rmt": {
+      "request_created_at": {
+        "gte": "2024-01-01T00:00:00Z"
+      }
+    }
+  },
+  "limit": 100,
+  "offset": 0,
+  "sort": {
+    "created_at": "desc"
+  }
+}'
+```
+
+### Filter by Model
+
+Query all GPT-4 requests:
+
+```bash cURL
+curl --request POST \
+  --url https://api.helicone.ai/v1/request/query \
+  --header 'Authorization: Bearer <HELICONE_API_KEY>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+  "filter": {
+    "request_response_rmt": {
+      "model": {
+        "equals": "gpt-4"
+      }
+    }
+  },
+  "limit": 50
+}'
+```
+
+### Filter by Custom Properties
+
+Query requests with specific custom properties:
+
+```bash cURL
+curl --request POST \
+  --url https://api.helicone.ai/v1/request/query \
+  --header 'Authorization: Bearer <HELICONE_API_KEY>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+  "filter": {
+    "request_response_rmt": {
+      "properties": {
+        "Environment": {
+          "equals": "production"
+        }
+      }
+    }
+  },
+  "limit": 100
+}'
+```
+
+### Complex Filter with AND/OR
+
+Query GPT-4 requests in production from the last week:
+
+```bash cURL
+curl --request POST \
+  --url https://api.helicone.ai/v1/request/query \
+  --header 'Authorization: Bearer <HELICONE_API_KEY>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+  "filter": {
+    "left": {
+      "request_response_rmt": {
+        "model": {
+          "equals": "gpt-4"
+        }
+      }
+    },
+    "operator": "and",
+    "right": {
+      "left": {
+        "request_response_rmt": {
+          "request_created_at": {
+            "gte": "2024-01-01T00:00:00Z"
+          }
+        }
+      },
+      "operator": "and",
+      "right": {
+        "request_response_rmt": {
+          "properties": {
+            "Environment": {
+              "equals": "production"
+            }
+          }
+        }
+      }
+    }
+  },
+  "limit": 100,
+  "sort": {
+    "created_at": "desc"
+  }
+}'
+```
+
+### Pagination
+
+Query requests with pagination:
+
+```bash cURL
+curl --request POST \
+  --url https://api.helicone.ai/v1/request/query \
+  --header 'Authorization: Bearer <HELICONE_API_KEY>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+  "filter": "all",
+  "limit": 50,
+  "offset": 100,
+  "sort": {
+    "created_at": "desc"
+  }
+}'
+```
+
+## Filter Operators
+
+The following operators are supported for different field types:
+
+### Text Fields
+- `equals` - Exact match
+- `not-equals` - Not equal to
+- `like` - Pattern match (case-sensitive)
+- `ilike` - Pattern match (case-insensitive)
+- `contains` - Contains substring
+- `not-contains` - Does not contain substring
+
+### Number Fields
+- `equals` - Equal to
+- `not-equals` - Not equal to
+- `gte` - Greater than or equal to
+- `lte` - Less than or equal to
+- `gt` - Greater than
+- `lt` - Less than
+
+### Timestamp Fields
+- `equals` - Exact timestamp match
+- `gte` - Greater than or equal to
+- `lte` - Less than or equal to
+- `gt` - Greater than
+- `lt` - Less than
+
+### Boolean Fields
+- `equals` - True or false
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Get Request by ID" icon="magnifying-glass" href="/api/requests/get">
+    Retrieve a specific request by its ID
+  </Card>
+  
+  <Card title="Add Feedback" icon="thumbs-up" href="/api/requests/feedback">
+    Add feedback to a request
+  </Card>
+  
+  <Card title="Add Properties" icon="tag" href="/api/requests/properties">
+    Add custom properties to a request
+  </Card>
+  
+  <Card title="Add Scores" icon="star" href="/api/requests/scores">
+    Add evaluation scores to a request
+  </Card>
+</CardGroup>
