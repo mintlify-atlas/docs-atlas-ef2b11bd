@@ -1,0 +1,232 @@
+{
+  "projectType": "saas",
+  "projectName": "Helicone",
+  "projectDescription": "Open source LLM observability platform and AI Gateway for monitoring, evaluating, and routing requests to 100+ AI models",
+  "theme": "mint",
+  "primaryColor": "#3188ad",
+  "lightColor": "#e4f0f7",
+  "darkColor": "#7e8385",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quick-start",
+              "platform-overview"
+            ]
+          },
+          {
+            "group": "AI Gateway",
+            "pages": [
+              "gateway/overview",
+              "gateway/getting-started",
+              "gateway/routing",
+              "gateway/fallbacks",
+              "gateway/prompt-integration",
+              "gateway/integrations"
+            ]
+          },
+          {
+            "group": "Observability",
+            "pages": [
+              "observability/overview",
+              "observability/requests",
+              "observability/sessions",
+              "observability/traces",
+              "observability/metrics",
+              "observability/custom-properties"
+            ]
+          },
+          {
+            "group": "Prompt Management",
+            "pages": [
+              "prompts/overview",
+              "prompts/versioning",
+              "prompts/deployment",
+              "prompts/experiments"
+            ]
+          },
+          {
+            "group": "Evaluation & Testing",
+            "pages": [
+              "evaluation/overview",
+              "evaluation/datasets",
+              "evaluation/scores",
+              "evaluation/feedback"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/caching",
+              "features/rate-limiting",
+              "features/webhooks",
+              "features/alerts",
+              "features/security"
+            ]
+          },
+          {
+            "group": "Self-Hosting",
+            "pages": [
+              "self-hosting/overview",
+              "self-hosting/docker",
+              "self-hosting/kubernetes",
+              "self-hosting/architecture"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/overview",
+              "integrations/openai",
+              "integrations/anthropic",
+              "integrations/langchain",
+              "integrations/vercel-ai-sdk",
+              "integrations/async-logging"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/introduction",
+              "api/authentication"
+            ]
+          },
+          {
+            "group": "AI Gateway",
+            "pages": [
+              "api/gateway/chat-completions",
+              "api/gateway/models"
+            ]
+          },
+          {
+            "group": "Requests",
+            "pages": [
+              "api/requests/query",
+              "api/requests/get",
+              "api/requests/feedback",
+              "api/requests/properties",
+              "api/requests/scores"
+            ]
+          },
+          {
+            "group": "Sessions",
+            "pages": [
+              "api/sessions/query",
+              "api/sessions/metrics",
+              "api/sessions/feedback"
+            ]
+          },
+          {
+            "group": "Prompts",
+            "pages": [
+              "api/prompts/create",
+              "api/prompts/get",
+              "api/prompts/update",
+              "api/prompts/query",
+              "api/prompts/versions"
+            ]
+          },
+          {
+            "group": "Evaluations",
+            "pages": [
+              "api/evals/query",
+              "api/evals/create",
+              "api/evals/scores"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "api/webhooks/list",
+              "api/webhooks/create",
+              "api/webhooks/delete"
+            ]
+          },
+          {
+            "group": "Users",
+            "pages": [
+              "api/users/query",
+              "api/users/metrics"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Use Cases",
+            "pages": [
+              "guides/overview",
+              "guides/agent-tracing",
+              "guides/cost-tracking",
+              "guides/debugging",
+              "guides/experiments",
+              "guides/fine-tuning"
+            ]
+          },
+          {
+            "group": "Tutorials",
+            "pages": [
+              "guides/tutorials/vercel-ai-gateway",
+              "guides/tutorials/ragas-evals",
+              "guides/tutorials/structured-outputs"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "AI Gateway with unified API for 100+ models",
+    "LLM observability and request logging",
+    "Prompt management and versioning",
+    "Session and trace tracking for agents",
+    "Cost and latency analytics",
+    "Evaluation and scoring framework",
+    "Intelligent routing and automatic fallbacks",
+    "Custom properties and metadata",
+    "Response caching",
+    "Rate limiting",
+    "Webhooks and alerts",
+    "Dataset creation and management",
+    "Self-hosting with Docker and Kubernetes"
+  ],
+  "publicApiSurface": [
+    "POST /v1/chat/completions - AI Gateway chat completions endpoint",
+    "GET /v1/models - List available AI models",
+    "POST /v1/request/query - Query logged requests",
+    "GET /v1/request - Get specific request details",
+    "POST /v1/request/feedback - Submit request feedback",
+    "PUT /v1/request/property - Update request properties",
+    "POST /v1/request/score - Score a request",
+    "POST /v1/session/query - Query sessions",
+    "POST /v1/session/metrics/query - Get session metrics",
+    "POST /v1/session/feedback - Submit session feedback",
+    "POST /v1/prompt/2025 - Create a prompt",
+    "GET /v1/prompt/2025/id/{promptId} - Get prompt by ID",
+    "POST /v1/prompt/2025/update - Update prompt version",
+    "POST /v1/prompt/2025/query - Query prompts",
+    "POST /v1/evals/query - Query evaluations",
+    "POST /v1/evals - Create evaluation",
+    "GET /v1/evals/scores - Get evaluation scores",
+    "GET /v1/webhooks - List webhooks",
+    "POST /v1/webhooks - Create webhook",
+    "DELETE /v1/webhooks - Delete webhook",
+    "POST /v1/user/query - Query users",
+    "POST /v1/user/metrics/query - Get user metrics",
+    "POST /v1/trace/log - Log trace data",
+    "@helicone/async - Async logging SDK with OpenLLMetry",
+    "@helicone/prompts - Prompt management SDK"
+  ]
+}
